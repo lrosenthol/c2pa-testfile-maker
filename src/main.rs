@@ -35,9 +35,7 @@ struct Cli {
 
 fn determine_output_path(input: &Path, output: &Path) -> Result<PathBuf> {
     if output.is_dir() {
-        let filename = input
-            .file_name()
-            .context("Input file has no filename")?;
+        let filename = input.file_name().context("Input file has no filename")?;
         Ok(output.join(filename))
     } else {
         Ok(output.to_path_buf())
@@ -61,8 +59,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Read and parse the JSON manifest configuration
-    let manifest_json = fs::read_to_string(&cli.manifest)
-        .context("Failed to read manifest JSON file")?;
+    let manifest_json =
+        fs::read_to_string(&cli.manifest).context("Failed to read manifest JSON file")?;
 
     // Validate input file exists
     if !cli.input.exists() {
@@ -74,8 +72,7 @@ fn main() -> Result<()> {
 
     // Create output directory if it doesn't exist
     if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent)
-            .context("Failed to create output directory")?;
+        fs::create_dir_all(parent).context("Failed to create output directory")?;
     }
 
     // Parse signing algorithm
@@ -109,4 +106,3 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-

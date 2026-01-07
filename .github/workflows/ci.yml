@@ -29,10 +29,17 @@ jobs:
           repository: contentauth/c2pa-rs
           path: c2pa-rs
       
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
       
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -94,6 +101,12 @@ jobs:
         with:
           repository: contentauth/c2pa-rs
           path: c2pa-rs
+      
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable

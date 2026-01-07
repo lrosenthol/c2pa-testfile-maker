@@ -57,7 +57,7 @@ fn test_dog_jpg_full_manifest() -> Result<()> {
             manifest.title().unwrap_or_default(),
             "Edited Photo with Complete Metadata"
         );
-        
+
         // Verify we have assertions
         assert!(!manifest.assertions().is_empty());
     }
@@ -109,7 +109,7 @@ fn test_dog_png_full_manifest() -> Result<()> {
             manifest.title().unwrap_or_default(),
             "Edited Photo with Complete Metadata"
         );
-        
+
         // Verify we have assertions
         assert!(!manifest.assertions().is_empty());
     }
@@ -161,7 +161,7 @@ fn test_dog_webp_full_manifest() -> Result<()> {
             manifest.title().unwrap_or_default(),
             "Edited Photo with Complete Metadata"
         );
-        
+
         // Verify we have assertions
         assert!(!manifest.assertions().is_empty());
     }
@@ -187,21 +187,19 @@ fn test_all_images_both_manifests() -> Result<()> {
             let output = generate_output_name(&input, manifest_type);
 
             match sign_file_with_manifest(&input, &output, manifest_path) {
-                Ok(_) => {
-                    match verify_signed_file(&output) {
-                        Ok(_) => {
-                            success_count += 1;
-                            println!(
-                                "✓ {} with {} manifest",
-                                input.file_name().unwrap().to_str().unwrap(),
-                                manifest_type
-                            );
-                        }
-                        Err(e) => {
-                            eprintln!("✗ Verification failed for {:?}: {}", output, e);
-                        }
+                Ok(_) => match verify_signed_file(&output) {
+                    Ok(_) => {
+                        success_count += 1;
+                        println!(
+                            "✓ {} with {} manifest",
+                            input.file_name().unwrap().to_str().unwrap(),
+                            manifest_type
+                        );
                     }
-                }
+                    Err(e) => {
+                        eprintln!("✗ Verification failed for {:?}: {}", output, e);
+                    }
+                },
                 Err(e) => {
                     eprintln!(
                         "✗ Signing failed for {:?} with {}: {}",
@@ -240,4 +238,3 @@ fn test_output_files_are_readable() {
         }
     }
 }
-

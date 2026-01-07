@@ -61,7 +61,7 @@ pub fn sign_file_with_manifest(
 fn test_signer() -> CallbackSigner {
     const CERTS: &[u8] = include_bytes!("../fixtures/certs/ed25519.pub");
     const PRIVATE_KEY: &[u8] = include_bytes!("../fixtures/certs/ed25519.pem");
-    
+
     let ed_signer = |_context: *const (), data: &[u8]| ed_sign(data, PRIVATE_KEY);
     CallbackSigner::new(ed_signer, SigningAlg::Ed25519, CERTS)
         .set_context("test" as *const _ as *const ())
@@ -88,7 +88,7 @@ fn ed_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
 /// Helper function to verify a signed file has a valid manifest
 pub fn verify_signed_file(file_path: &Path) -> Result<Reader> {
     let reader = Reader::from_file(file_path)?;
-    
+
     // Ensure we have an active manifest
     assert!(
         reader.active_label().is_some(),
@@ -130,7 +130,7 @@ mod tests {
     fn test_manifests_exist() {
         let simple = manifests_dir().join("simple_manifest.json");
         let full = manifests_dir().join("full_manifest.json");
-        
+
         assert!(simple.exists(), "simple_manifest.json should exist");
         assert!(full.exists(), "full_manifest.json should exist");
     }
@@ -139,9 +139,8 @@ mod tests {
     fn test_certs_exist() {
         let cert = certs_dir().join("es256_cert.pem");
         let key = certs_dir().join("es256_private.pem");
-        
+
         assert!(cert.exists(), "Test certificate should exist");
         assert!(key.exists(), "Test private key should exist");
     }
 }
-
