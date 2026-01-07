@@ -79,6 +79,10 @@ c2pa-testfile-maker \
 - `-k, --key <FILE>`: Path to the private key file in PEM format (required)
 - `-a, --algorithm <ALGORITHM>`: Signing algorithm (default: es256)
   - Supported: `es256`, `es384`, `es512`, `ps256`, `ps384`, `ps512`, `ed25519`
+- `--allow-self-signed`: Allow self-signed certificates for testing/development (default: false)
+  - ⚠️ **Warning**: Use only for development and testing with properly formatted certificates
+  - Bypasses certificate chain validation during signer creation
+  - Note: The c2pa library may still reject truly self-signed certificates during signing
 
 ### Example
 
@@ -91,6 +95,23 @@ c2pa-testfile-maker \
   --key certs/private_key.pem \
   --algorithm es256
 ```
+
+### Development/Testing with Test Certificates
+
+For development and testing, you can use the included test certificates with the `--allow-self-signed` flag:
+
+```bash
+./target/release/c2pa-testfile-maker \
+  --manifest examples/simple_manifest.json \
+  --input testfiles/Dog.jpg \
+  --output output/Dog_signed.jpg \
+  --cert tests/fixtures/certs/ed25519.pub \
+  --key tests/fixtures/certs/ed25519.pem \
+  --algorithm ed25519 \
+  --allow-self-signed
+```
+
+**Note**: The test certificates in `tests/fixtures/certs/` have a proper certificate chain and work with the `--allow-self-signed` flag. Simple self-signed certificates may still be rejected by the c2pa library during the signing process.
 
 ### Output to Directory
 
@@ -260,4 +281,3 @@ If you encounter build errors, ensure you have:
 1. The latest Rust toolchain (`rustup update`)
 2. Required system libraries (OpenSSL, etc.)
 3. A C/C++ compiler installed
-

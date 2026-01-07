@@ -5,7 +5,7 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'c2pa-testfile-maker'",
+      "name": "simple w/JPG",
       "cargo": {
         "args": [
           "build",
@@ -20,9 +20,37 @@
       "args": [
         "--manifest", "examples/simple_manifest.json",
         "--input", "testfiles/Dog.jpg",
-        "--output", "target/debug_output.jpg",
-        "--cert", "examples/certs/es256_cert.pem",
-        "--key", "examples/certs/es256_private.pem"
+        "--output", "target/output/simple_output.jpg",
+        "--cert", "tests/fixtures/certs/ed25519.pub",
+        "--key", "tests/fixtures/certs/ed25519.pem",
+        "--algorithm", "ed25519",
+        "--allow-self-signed"
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "simple w/PNG",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=c2pa-testfile-maker",
+          "--package=c2pa-testfile-maker"
+        ],
+        "filter": {
+          "name": "c2pa-testfile-maker",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "--manifest", "examples/simple_manifest.json",
+        "--input", "testfiles/Dog.png",
+        "--output", "target/output/simple_output.png",
+        "--cert", "tests/fixtures/certs/ed25519.pub",
+        "--key", "tests/fixtures/certs/ed25519.pem",
+        "--algorithm", "ed25519",
+        "--allow-self-signed"
       ],
       "cwd": "${workspaceFolder}"
     },
