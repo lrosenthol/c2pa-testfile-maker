@@ -77,8 +77,9 @@ c2pa-testfile-maker \
 - `-o, --output <PATH>`: Path to the output file or directory (required)
 - `-c, --cert <FILE>`: Path to the certificate file in PEM format (required)
 - `-k, --key <FILE>`: Path to the private key file in PEM format (required)
-- `-a, --algorithm <ALGORITHM>`: Signing algorithm (default: es256)
+- `-a, --algorithm <ALGORITHM>`: Signing algorithm (optional, auto-detected from certificate if not specified)
   - Supported: `es256`, `es384`, `es512`, `ps256`, `ps384`, `ps512`, `ed25519`
+  - Auto-detection examines the certificate to determine the appropriate algorithm
 - `--allow-self-signed`: Allow self-signed certificates for testing/development (default: false)
   - ⚠️ **Warning**: Use only for development and testing with properly formatted certificates
   - Bypasses certificate chain validation during signer creation
@@ -92,9 +93,10 @@ c2pa-testfile-maker \
   --input examples/sample.jpg \
   --output output/signed_sample.jpg \
   --cert certs/certificate.pem \
-  --key certs/private_key.pem \
-  --algorithm es256
+  --key certs/private_key.pem
 ```
+
+Note: The `--algorithm` parameter is optional. If not specified, the tool will automatically detect the appropriate algorithm from your certificate.
 
 ### Development/Testing with Test Certificates
 
@@ -126,6 +128,29 @@ If the output path is a directory, the tool will create a file with the same nam
   --key certs/private_key.pem
 # Creates: output/sample.jpg
 ```
+
+### Algorithm Auto-Detection
+
+The tool can automatically detect the signing algorithm from your certificate, eliminating the need to specify `--algorithm`:
+
+- **ES256/ES384/ES512**: Detected from ECDSA certificates based on the curve (P-256, P-384, or P-521)
+- **PS256**: Detected from RSA certificates (defaults to PS256 for RSA keys)
+- **Ed25519**: Detected from Ed25519 certificates
+
+Example with auto-detection:
+
+```bash
+./target/release/c2pa-testfile-maker \
+  --manifest examples/manifest.json \
+  --input examples/sample.jpg \
+  --output output/signed_sample.jpg \
+  --cert certs/certificate.pem \
+  --key certs/private_key.pem
+# The tool will display: "Auto-detecting signing algorithm from certificate..."
+# And show the detected algorithm
+```
+
+You can still override the auto-detection by explicitly specifying `--algorithm` if needed.
 
 ## Manifest JSON Format
 

@@ -29,8 +29,9 @@ struct Cli {
     key: PathBuf,
 
     /// Signing algorithm (es256, es384, es512, ps256, ps384, ps512, ed25519)
-    #[arg(short, long, default_value = "es256")]
-    algorithm: String,
+    /// If not specified, will be auto-detected from the certificate
+    #[arg(short, long)]
+    algorithm: Option<String>,
 
     /// Allow self-signed certificates (for testing/development only)
     #[arg(long, default_value = "false")]
@@ -56,6 +57,57 @@ fn parse_signing_algorithm(alg: &str) -> Result<SigningAlg> {
         "ps512" => Ok(SigningAlg::Ps512),
         "ed25519" => Ok(SigningAlg::Ed25519),
         _ => anyhow::bail!("Unsupported signing algorithm: {}", alg),
+    }
+}
+
+/// Detect the signing algorithm from a certificate file
+/// This examines the public key type and parameters to determine the appropriate algorithm
+fn detect_signing_algorithm(cert_path: &Path) -> Result<SigningAlg> {
+    use x509_parser::prelude::*;
+
+    let cert_data = fs::read(cert_path).context("Failed to read certificate file")?;
+
+    // Parse PEM
+    let pem = ::pem::parse(&cert_data)
+        .map_err(|e| anyhow::anyhow!("Failed to parse certificate PEM: {}", e))?;
+
+    // Parse X.509 certificate
+    let (_, cert) = X509Certificate::from_der(pem.contents())
+        .map_err(|e| anyhow::anyhow!("Failed to parse X.509 certificate: {}", e))?;
+
+    // Get the public key algorithm
+    let public_key = cert.public_key();
+    let alg_oid = &public_key.algorithm.algorithm;
+
+    // Detect algorithm based on OID
+    match alg_oid.to_id_string().as_str() {
+        "1.2.840.10045.2.1" => {
+            // EC Public Key - need to check the curve
+            if let Some(params) = &public_key.algorithm.parameters {
+                let curve_oid = params
+                    .as_oid()
+                    .map_err(|_| anyhow::anyhow!("Failed to parse curve OID"))?;
+
+                match curve_oid.to_id_string().as_str() {
+                    "1.2.840.10045.3.1.7" => Ok(SigningAlg::Es256), // P-256 (secp256r1)
+                    "1.3.132.0.34" => Ok(SigningAlg::Es384),        // P-384 (secp384r1)
+                    "1.3.132.0.35" => Ok(SigningAlg::Es512),        // P-521 (secp521r1)
+                    other => anyhow::bail!("Unsupported EC curve OID: {}", other),
+                }
+            } else {
+                anyhow::bail!("EC key missing curve parameters")
+            }
+        }
+        "1.2.840.113549.1.1.1" => {
+            // RSA - default to PS256
+            // Could potentially examine key size to choose PS384/PS512, but PS256 is the most common
+            Ok(SigningAlg::Ps256)
+        }
+        "1.3.101.112" => {
+            // Ed25519
+            Ok(SigningAlg::Ed25519)
+        }
+        other => anyhow::bail!("Unsupported public key algorithm OID: {}", other),
     }
 }
 
@@ -93,10 +145,9 @@ fn create_callback_signer(
 fn ed25519_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
     use c2pa::crypto::raw_signature::RawSignerError;
     use ed25519_dalek::{Signature, Signer, SigningKey};
-    use pem::parse;
 
     // Parse the PEM data to get the private key
-    let pem = parse(private_key).map_err(|e| c2pa::Error::OtherError(Box::new(e)))?;
+    let pem = ::pem::parse(private_key).map_err(|e| c2pa::Error::OtherError(Box::new(e)))?;
 
     // For Ed25519, the key is 32 bytes long, so we skip the first 16 bytes of the PEM data
     let key_bytes = &pem.contents()[16..];
@@ -113,10 +164,9 @@ fn ecdsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
     use c2pa::crypto::raw_signature::RawSignerError;
     use p256::ecdsa::{signature::Signer, Signature, SigningKey};
     use p256::pkcs8::DecodePrivateKey;
-    use pem::parse;
 
     // Parse the PEM data to get the private key
-    let pem = parse(private_key).map_err(|e| c2pa::Error::OtherError(Box::new(e)))?;
+    let pem = ::pem::parse(private_key).map_err(|e| c2pa::Error::OtherError(Box::new(e)))?;
 
     let signing_key = SigningKey::from_pkcs8_der(pem.contents())
         .map_err(|e: p256::pkcs8::Error| RawSignerError::InternalError(e.to_string()))?;
@@ -129,7 +179,6 @@ fn ecdsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
 /// Sign data using RSA-PSS (PS256, PS384, PS512)
 fn rsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
     use c2pa::crypto::raw_signature::RawSignerError;
-    use pem::parse;
     use rsa::pkcs1v15::SigningKey;
     use rsa::pkcs8::DecodePrivateKey;
     use rsa::sha2::Sha256;
@@ -137,7 +186,7 @@ fn rsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
     use rsa::RsaPrivateKey;
 
     // Parse the PEM data to get the private key
-    let pem = parse(private_key).map_err(|e| c2pa::Error::OtherError(Box::new(e)))?;
+    let pem = ::pem::parse(private_key).map_err(|e| c2pa::Error::OtherError(Box::new(e)))?;
 
     let private_key = RsaPrivateKey::from_pkcs8_der(pem.contents())
         .map_err(|e: rsa::pkcs8::Error| RawSignerError::InternalError(e.to_string()))?;
@@ -175,13 +224,20 @@ fn main() -> Result<()> {
         println!("  Note: Removed existing output file: {:?}", output_path);
     }
 
-    // Parse signing algorithm
-    let signing_alg = parse_signing_algorithm(&cli.algorithm)?;
+    // Auto-detect or parse signing algorithm
+    let signing_alg = if let Some(alg_str) = &cli.algorithm {
+        parse_signing_algorithm(alg_str)?
+    } else {
+        println!("Auto-detecting signing algorithm from certificate...");
+        let detected = detect_signing_algorithm(&cli.cert)?;
+        println!("  Detected: {:?}", detected);
+        detected
+    };
 
     println!("Creating C2PA manifest...");
     println!("  Input: {:?}", cli.input);
     println!("  Output: {:?}", output_path);
-    println!("  Algorithm: {}", cli.algorithm);
+    println!("  Algorithm: {:?}", signing_alg);
     if cli.allow_self_signed {
         println!("  Note: Allowing self-signed certificates (development mode)");
     }
@@ -216,4 +272,42 @@ fn main() -> Result<()> {
     println!("  Output file: {:?}", output_path);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_signing_algorithm_ed25519() {
+        // Test with the ed25519 test certificate
+        let cert_path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/certs/ed25519.pub");
+
+        if cert_path.exists() {
+            let result = detect_signing_algorithm(&cert_path);
+            assert!(
+                result.is_ok(),
+                "Should successfully detect Ed25519 algorithm"
+            );
+            assert_eq!(result.unwrap(), SigningAlg::Ed25519);
+        }
+    }
+
+    #[test]
+    fn test_parse_signing_algorithm() {
+        assert_eq!(parse_signing_algorithm("es256").unwrap(), SigningAlg::Es256);
+        assert_eq!(parse_signing_algorithm("ES256").unwrap(), SigningAlg::Es256);
+        assert_eq!(parse_signing_algorithm("es384").unwrap(), SigningAlg::Es384);
+        assert_eq!(parse_signing_algorithm("es512").unwrap(), SigningAlg::Es512);
+        assert_eq!(parse_signing_algorithm("ps256").unwrap(), SigningAlg::Ps256);
+        assert_eq!(parse_signing_algorithm("ps384").unwrap(), SigningAlg::Ps384);
+        assert_eq!(parse_signing_algorithm("ps512").unwrap(), SigningAlg::Ps512);
+        assert_eq!(
+            parse_signing_algorithm("ed25519").unwrap(),
+            SigningAlg::Ed25519
+        );
+
+        assert!(parse_signing_algorithm("invalid").is_err());
+    }
 }

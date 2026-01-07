@@ -18,12 +18,11 @@
         }
       },
       "args": [
-        "--manifest", "examples/simple_manifest.json",
-        "--input", "testfiles/Dog.jpg",
-        "--output", "target/output/simple_output.jpg",
-        "--cert", "tests/fixtures/certs/ed25519.pub",
-        "--key", "tests/fixtures/certs/ed25519.pem",
-        "--algorithm", "ed25519",
+        "-m", "examples/simple_manifest.json",
+        "-i", "testfiles/Dog.jpg",
+        "-o", "target/output/simple_output.jpg",
+        "-c", "tests/fixtures/certs/ed25519.pub",
+        "-k", "tests/fixtures/certs/ed25519.pem",
         "--allow-self-signed"
       ],
       "cwd": "${workspaceFolder}"
@@ -44,12 +43,11 @@
         }
       },
       "args": [
-        "--manifest", "examples/simple_manifest.json",
-        "--input", "testfiles/Dog.png",
-        "--output", "target/output/simple_output.png",
-        "--cert", "tests/fixtures/certs/ed25519.pub",
-        "--key", "tests/fixtures/certs/ed25519.pem",
-        "--algorithm", "ed25519",
+        "-m", "examples/simple_manifest.json",
+        "-i", "testfiles/Dog.png",
+        "-o", "target/output/simple_output.png",
+        "-c", "tests/fixtures/certs/ed25519.pub",
+        "-k", "tests/fixtures/certs/ed25519.pem",
         "--allow-self-signed"
       ],
       "cwd": "${workspaceFolder}"
