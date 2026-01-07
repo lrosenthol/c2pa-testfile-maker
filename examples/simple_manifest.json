@@ -1,0 +1,40 @@
+{
+  "claim_generator_info": [
+    {
+      "name": "c2pa-testfile-maker/0.1.0",
+      "version": "0.1.0"
+    }
+  ],
+  "title": "Example Image with C2PA Manifest",
+  "format": "image/jpeg",
+  "assertions": [
+    {
+      "label": "c2pa.actions",
+      "data": {
+        "actions": [
+          {
+            "action": "c2pa.created",
+            "when": "2024-01-07T12:00:00Z",
+            "softwareAgent": "c2pa-testfile-maker 0.1.0"
+          }
+        ]
+      }
+    },
+    {
+      "label": "stds.schema-org.CreativeWork",
+      "data": {
+        "@context": "https://schema.org",
+        "@type": "CreativeWork",
+        "author": [
+          {
+            "@type": "Person",
+            "name": "Test User"
+          }
+        ],
+        "license": "https://creativecommons.org/licenses/by/4.0/"
+      }
+    }
+  ],
+  "ingredients": []
+}
+

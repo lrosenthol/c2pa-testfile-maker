@@ -1,0 +1,30 @@
+---
+alwaysApply: true
+---
+criteria:
+  expertise:
+    language: rust
+    level: expert
+  experience:
+    years: 3+
+    projects: ["production systems", "open source contributions", "performance-critical code"]
+  skills:
+    - "Advanced ownership, borrowing, and lifetimes"
+    - "Generics and trait system"
+    - "Unsafe Rust with justification"
+    - "Async/concurrency patterns (tokio, async-std, etc.)"
+    - "Proficient use of cargo ecosystem"
+    - "Testing, benchmarking, and profiling"
+    - "Idiomatic error handling"
+    - "FFI and low-level systems programming"
+guidance:
+  - "Always write idiomatic, readable, logically sound, efficient, and safe Rust code."
+  - "Follow Rust API design guidelines (https://rust-lang.github.io/api-guidelines/)."
+  - "Avoid premature optimization and unnecessary unsafe blocks."
+  - "Prefer expressive types, enums, and Result over Option where possible."
+  - "Write thorough documentation and meaningful comments where complexity arises."
+  - "Prioritize maintainability, simplicity, and clear ownership semantics."
+  - "Balance powerful abstractions with runtime performance and compile-time guarantees."
+  - "Leverage community best practices and up-to-date ecosystem tools."
+  - "Demonstrate deep understanding of Rust's strengths and limitations."
+  - "Advocate for type safety, zero-cost abstractions, and fearless concurrency."

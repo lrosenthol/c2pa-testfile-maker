@@ -1,0 +1,28 @@
+[package]
+name = "c2pa-testfile-maker"
+version = "0.1.0"
+edition = "2021"
+authors = ["Leonard Rosenthol"]
+description = "A CLI tool to create and embed C2PA manifests into media assets using JSON configuration"
+license = "MIT"
+repository = "https://github.com/lrosenthol/c2pa-testfile-maker"
+keywords = ["c2pa", "content-authenticity", "provenance", "media", "cli"]
+categories = ["command-line-utilities", "multimedia"]
+
+[dependencies]
+c2pa = { path = "../c2pa-rs/sdk", features = ["file_io"] }
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+
+[dev-dependencies]
+ed25519-dalek = "2.2"
+pem = "3.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+

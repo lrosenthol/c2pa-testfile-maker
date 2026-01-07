@@ -1,0 +1,26 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Output
+/output/
+*.signed.*
+
+# Certificates (except examples)
+*.pem
+!examples/certs/*.pem
+
+# Test files
+/test_output/
+/temp/
+
