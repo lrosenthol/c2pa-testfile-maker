@@ -177,7 +177,10 @@ fn test_all_images_all_manifests() -> Result<()> {
         ("simple", manifests_dir().join("simple_manifest.json")),
         ("full", manifests_dir().join("full_manifest.json")),
         ("asset_ref", manifests_dir().join("asset_ref_manifest.json")),
-        ("asset_type", manifests_dir().join("asset_type_manifest.json")),
+        (
+            "asset_type",
+            manifests_dir().join("asset_type_manifest.json"),
+        ),
     ];
 
     let mut success_count = 0;
@@ -250,7 +253,10 @@ fn test_dog_jpg_asset_type_manifest() -> Result<()> {
         assert!(has_asset_type, "Should have c2pa.asset-type assertion");
     }
 
-    println!("✓ Dog.jpg with asset_type_manifest.json: {}", output.display());
+    println!(
+        "✓ Dog.jpg with asset_type_manifest.json: {}",
+        output.display()
+    );
     Ok(())
 }
 
@@ -279,7 +285,10 @@ fn test_dog_png_asset_type_manifest() -> Result<()> {
         assert!(has_asset_type, "Should have c2pa.asset-type assertion");
     }
 
-    println!("✓ Dog.png with asset_type_manifest.json: {}", output.display());
+    println!(
+        "✓ Dog.png with asset_type_manifest.json: {}",
+        output.display()
+    );
     Ok(())
 }
 
@@ -308,7 +317,10 @@ fn test_dog_webp_asset_type_manifest() -> Result<()> {
         assert!(has_asset_type, "Should have c2pa.asset-type assertion");
     }
 
-    println!("✓ Dog.webp with asset_type_manifest.json: {}", output.display());
+    println!(
+        "✓ Dog.webp with asset_type_manifest.json: {}",
+        output.display()
+    );
     Ok(())
 }
 
@@ -341,7 +353,10 @@ fn test_dog_jpg_asset_ref_manifest() -> Result<()> {
         assert!(has_asset_ref, "Should have c2pa.asset-ref assertion");
     }
 
-    println!("✓ Dog.jpg with asset_ref_manifest.json: {}", output.display());
+    println!(
+        "✓ Dog.jpg with asset_ref_manifest.json: {}",
+        output.display()
+    );
     Ok(())
 }
 
@@ -370,7 +385,10 @@ fn test_dog_png_asset_ref_manifest() -> Result<()> {
         assert!(has_asset_ref, "Should have c2pa.asset-ref assertion");
     }
 
-    println!("✓ Dog.png with asset_ref_manifest.json: {}", output.display());
+    println!(
+        "✓ Dog.png with asset_ref_manifest.json: {}",
+        output.display()
+    );
     Ok(())
 }
 
@@ -399,7 +417,10 @@ fn test_dog_webp_asset_ref_manifest() -> Result<()> {
         assert!(has_asset_ref, "Should have c2pa.asset-ref assertion");
     }
 
-    println!("✓ Dog.webp with asset_ref_manifest.json: {}", output.display());
+    println!(
+        "✓ Dog.webp with asset_ref_manifest.json: {}",
+        output.display()
+    );
     Ok(())
 }
 
