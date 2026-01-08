@@ -38,10 +38,7 @@ fn test_dog_jpg_simple_manifest() -> Result<()> {
     // Verify basic manifest properties
     if let Some(manifest_label) = reader.active_label() {
         let manifest = reader.get_manifest(manifest_label).unwrap();
-        assert_eq!(
-            manifest.title().unwrap_or_default(),
-            "Created Image"
-        );
+        assert_eq!(manifest.title().unwrap_or_default(), "Created Image");
     }
 
     println!("✓ Dog.jpg with simple_manifest.json: {}", output.display());
@@ -62,10 +59,7 @@ fn test_dog_jpg_full_manifest() -> Result<()> {
     // Verify detailed manifest properties
     if let Some(manifest_label) = reader.active_label() {
         let manifest = reader.get_manifest(manifest_label).unwrap();
-        assert_eq!(
-            manifest.title().unwrap_or_default(),
-            "Edited Photo"
-        );
+        assert_eq!(manifest.title().unwrap_or_default(), "Edited Photo");
 
         // Verify we have assertions
         assert!(!manifest.assertions().is_empty());
@@ -90,10 +84,7 @@ fn test_dog_png_simple_manifest() -> Result<()> {
     // Verify basic manifest properties
     if let Some(manifest_label) = reader.active_label() {
         let manifest = reader.get_manifest(manifest_label).unwrap();
-        assert_eq!(
-            manifest.title().unwrap_or_default(),
-            "Created Image"
-        );
+        assert_eq!(manifest.title().unwrap_or_default(), "Created Image");
     }
 
     println!("✓ Dog.png with simple_manifest.json: {}", output.display());
@@ -114,10 +105,7 @@ fn test_dog_png_full_manifest() -> Result<()> {
     // Verify detailed manifest properties
     if let Some(manifest_label) = reader.active_label() {
         let manifest = reader.get_manifest(manifest_label).unwrap();
-        assert_eq!(
-            manifest.title().unwrap_or_default(),
-            "Edited Photo"
-        );
+        assert_eq!(manifest.title().unwrap_or_default(), "Edited Photo");
 
         // Verify we have assertions
         assert!(!manifest.assertions().is_empty());
@@ -142,10 +130,7 @@ fn test_dog_webp_simple_manifest() -> Result<()> {
     // Verify basic manifest properties
     if let Some(manifest_label) = reader.active_label() {
         let manifest = reader.get_manifest(manifest_label).unwrap();
-        assert_eq!(
-            manifest.title().unwrap_or_default(),
-            "Created Image"
-        );
+        assert_eq!(manifest.title().unwrap_or_default(), "Created Image");
     }
 
     println!("✓ Dog.webp with simple_manifest.json: {}", output.display());
@@ -166,10 +151,7 @@ fn test_dog_webp_full_manifest() -> Result<()> {
     // Verify detailed manifest properties
     if let Some(manifest_label) = reader.active_label() {
         let manifest = reader.get_manifest(manifest_label).unwrap();
-        assert_eq!(
-            manifest.title().unwrap_or_default(),
-            "Edited Photo"
-        );
+        assert_eq!(manifest.title().unwrap_or_default(), "Edited Photo");
 
         // Verify we have assertions
         assert!(!manifest.assertions().is_empty());
@@ -588,8 +570,7 @@ fn test_manifest_roundtrip_with_spec_version() -> Result<()> {
 
     // Compare title
     assert_eq!(
-        extracted_manifest["title"],
-        original["title"],
+        extracted_manifest["title"], original["title"],
         "Title should match"
     );
 
@@ -609,8 +590,10 @@ fn test_manifest_roundtrip_with_spec_version() -> Result<()> {
 
     let extracted_actions = extracted_assertions
         .iter()
-        .find(|a| a["label"].as_str() == Some("c2pa.actions.v2")
-             || a["label"].as_str() == Some("c2pa.actions"))
+        .find(|a| {
+            a["label"].as_str() == Some("c2pa.actions.v2")
+                || a["label"].as_str() == Some("c2pa.actions")
+        })
         .expect("Extracted should have c2pa.actions assertion");
 
     // Compare the actions data
@@ -633,14 +616,12 @@ fn test_manifest_roundtrip_with_spec_version() -> Result<()> {
     let extracted_action = &extracted_actions_data[0];
 
     assert_eq!(
-        extracted_action["action"],
-        original_action["action"],
+        extracted_action["action"], original_action["action"],
         "Action type should match"
     );
 
     assert_eq!(
-        extracted_action["when"],
-        original_action["when"],
+        extracted_action["when"], original_action["when"],
         "Action timestamp should match"
     );
 
@@ -665,7 +646,10 @@ fn test_manifest_roundtrip_with_spec_version() -> Result<()> {
         .as_array()
         .expect("Should have claim_generator_info");
 
-    assert!(!extracted_claim_gen.is_empty(), "Should have at least one claim generator");
+    assert!(
+        !extracted_claim_gen.is_empty(),
+        "Should have at least one claim generator"
+    );
 
     // Check that the claim generator name contains our app name
     let has_our_generator = extracted_claim_gen.iter().any(|gen| {
@@ -683,9 +667,11 @@ fn test_manifest_roundtrip_with_spec_version() -> Result<()> {
     println!("✓ Round-trip test passed: manifest data preserved correctly");
     println!("  Original title: {}", original["title"]);
     println!("  Extracted title: {}", extracted_manifest["title"]);
-    println!("  Actions preserved: {}/{}",
-             extracted_actions_data.len(),
-             original_actions_data.len());
+    println!(
+        "  Actions preserved: {}/{}",
+        extracted_actions_data.len(),
+        original_actions_data.len()
+    );
 
     Ok(())
 }
