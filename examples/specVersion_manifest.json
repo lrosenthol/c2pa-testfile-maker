@@ -1,0 +1,26 @@
+{
+    "specVersion": "2.2.0",
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Created Image",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "when": "2024-01-07T12:00:00Z",
+                        "softwareAgent": "c2pa-testfile-maker 0.1.0"
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}

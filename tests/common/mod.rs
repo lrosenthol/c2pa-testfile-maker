@@ -130,9 +130,13 @@ mod tests {
     fn test_manifests_exist() {
         let simple = manifests_dir().join("simple_manifest.json");
         let full = manifests_dir().join("full_manifest.json");
+        let asset_ref = manifests_dir().join("asset_ref_manifest.json");
+        let asset_type = manifests_dir().join("asset_type_manifest.json");
 
         assert!(simple.exists(), "simple_manifest.json should exist");
         assert!(full.exists(), "full_manifest.json should exist");
+        assert!(asset_ref.exists(), "asset_ref_manifest.json should exist");
+        assert!(asset_type.exists(), "asset_type_manifest.json should exist");
     }
 
     #[test]

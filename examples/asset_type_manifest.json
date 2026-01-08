@@ -1,0 +1,45 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "Image with Asset Type Information",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "when": "2024-01-07T12:00:00Z",
+                        "softwareAgent": "c2pa-testfile-maker 0.1.0"
+                    }
+                ]
+            },
+            "created": true
+        },
+        {
+            "label": "c2pa.asset-type",
+            "data": {
+                "dc:format": "image/jpeg",
+                "types": [
+                    {
+                        "type": "c2pa.types.model.tensorflow",
+                        "version": "2.15.0"
+                    },
+                    {
+                        "type": "c2pa.types.generator",
+                        "version": "1.0.0"
+                    },
+                    {
+                        "type": "com.example.custom-type",
+                        "version": "3.2.1"
+                    }
+                ]
+            }
+        }
+    ],
+    "ingredients": []
+}

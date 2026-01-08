@@ -29,3 +29,4 @@ Cargo.lock
 # Test files
 /test_output/
 /temp/
+/INTERNAL/cddl/*

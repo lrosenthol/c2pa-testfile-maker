@@ -5,8 +5,7 @@
       "version": "0.1.0"
     }
   ],
-  "title": "Example Image with C2PA Manifest",
-  "format": "image/jpeg",
+  "title": "Created Image",
   "assertions": [
     {
       "label": "c2pa.actions",
@@ -18,7 +17,8 @@
             "softwareAgent": "c2pa-testfile-maker 0.1.0"
           }
         ]
-      }
+      },
+      "created": true
     }
   ],
   "ingredients": []
