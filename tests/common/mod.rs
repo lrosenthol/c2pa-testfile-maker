@@ -164,11 +164,23 @@ mod tests {
         let full = manifests_dir().join("full_manifest.json");
         let asset_ref = manifests_dir().join("asset_ref_manifest.json");
         let asset_type = manifests_dir().join("asset_type_manifest.json");
+        let cloud_data = manifests_dir().join("cloud_data_manifest.json");
+        let depthmap_gdepth = manifests_dir().join("depthmap_gdepth_manifest.json");
+        let external_reference = manifests_dir().join("external_reference_manifest.json");
 
         assert!(simple.exists(), "simple_manifest.json should exist");
         assert!(full.exists(), "full_manifest.json should exist");
         assert!(asset_ref.exists(), "asset_ref_manifest.json should exist");
         assert!(asset_type.exists(), "asset_type_manifest.json should exist");
+        assert!(cloud_data.exists(), "cloud_data_manifest.json should exist");
+        assert!(
+            depthmap_gdepth.exists(),
+            "depthmap_gdepth_manifest.json should exist"
+        );
+        assert!(
+            external_reference.exists(),
+            "external_reference_manifest.json should exist"
+        );
     }
 
     #[test]

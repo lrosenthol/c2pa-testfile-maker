@@ -172,6 +172,18 @@ fn test_all_images_all_manifests() -> Result<()> {
             "asset_type",
             manifests_dir().join("asset_type_manifest.json"),
         ),
+        (
+            "cloud_data",
+            manifests_dir().join("cloud_data_manifest.json"),
+        ),
+        (
+            "depthmap_gdepth",
+            manifests_dir().join("depthmap_gdepth_manifest.json"),
+        ),
+        (
+            "external_reference",
+            manifests_dir().join("external_reference_manifest.json"),
+        ),
     ];
 
     let mut success_count = 0;
@@ -213,6 +225,327 @@ fn test_all_images_all_manifests() -> Result<()> {
         "All image/manifest combinations should succeed"
     );
 
+    Ok(())
+}
+
+// Tests for external-reference manifest
+#[test]
+fn test_dog_jpg_external_reference_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("external_reference_manifest.json");
+    let output = generate_output_name(&input, "external_reference", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify manifest properties and external-reference assertion
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with External Reference"
+        );
+
+        // Verify we have assertions including external-reference
+        let assertions = manifest.assertions();
+        assert!(!assertions.is_empty());
+
+        // Check that c2pa.external-reference assertion exists
+        let has_external_ref = assertions
+            .iter()
+            .any(|a| a.label() == "c2pa.external-reference");
+        assert!(
+            has_external_ref,
+            "Should have c2pa.external-reference assertion"
+        );
+    }
+
+    println!(
+        "✓ Dog.jpg with external_reference_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_dog_png_external_reference_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("external_reference_manifest.json");
+    let output = generate_output_name(&input, "external_reference", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify manifest properties and external-reference assertion
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with External Reference"
+        );
+
+        // Verify we have the external-reference assertion
+        let assertions = manifest.assertions();
+        let has_external_ref = assertions
+            .iter()
+            .any(|a| a.label() == "c2pa.external-reference");
+        assert!(
+            has_external_ref,
+            "Should have c2pa.external-reference assertion"
+        );
+    }
+
+    println!(
+        "✓ Dog.png with external_reference_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_dog_webp_external_reference_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.webp");
+    let manifest = manifests_dir().join("external_reference_manifest.json");
+    let output = generate_output_name(&input, "external_reference", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify manifest properties and external-reference assertion
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with External Reference"
+        );
+
+        // Verify we have the external-reference assertion
+        let assertions = manifest.assertions();
+        let has_external_ref = assertions
+            .iter()
+            .any(|a| a.label() == "c2pa.external-reference");
+        assert!(
+            has_external_ref,
+            "Should have c2pa.external-reference assertion"
+        );
+    }
+
+    println!(
+        "✓ Dog.webp with external_reference_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+// Tests for cloud-data manifest
+#[test]
+fn test_dog_jpg_cloud_data_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("cloud_data_manifest.json");
+    let output = generate_output_name(&input, "cloud_data", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify manifest properties and cloud-data assertion
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with Cloud-Hosted Assertion Data"
+        );
+
+        // Verify we have assertions including cloud-data
+        let assertions = manifest.assertions();
+        assert!(!assertions.is_empty());
+
+        // Check that c2pa.cloud-data assertion exists
+        let has_cloud_data = assertions.iter().any(|a| a.label() == "c2pa.cloud-data");
+        assert!(has_cloud_data, "Should have c2pa.cloud-data assertion");
+    }
+
+    println!(
+        "✓ Dog.jpg with cloud_data_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_dog_png_cloud_data_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("cloud_data_manifest.json");
+    let output = generate_output_name(&input, "cloud_data", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify manifest properties and cloud-data assertion
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with Cloud-Hosted Assertion Data"
+        );
+
+        // Verify we have the cloud-data assertion
+        let assertions = manifest.assertions();
+        let has_cloud_data = assertions.iter().any(|a| a.label() == "c2pa.cloud-data");
+        assert!(has_cloud_data, "Should have c2pa.cloud-data assertion");
+    }
+
+    println!(
+        "✓ Dog.png with cloud_data_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_dog_webp_cloud_data_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.webp");
+    let manifest = manifests_dir().join("cloud_data_manifest.json");
+    let output = generate_output_name(&input, "cloud_data", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify manifest properties and cloud-data assertion
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with Cloud-Hosted Assertion Data"
+        );
+
+        // Verify we have the cloud-data assertion
+        let assertions = manifest.assertions();
+        let has_cloud_data = assertions.iter().any(|a| a.label() == "c2pa.cloud-data");
+        assert!(has_cloud_data, "Should have c2pa.cloud-data assertion");
+    }
+
+    println!(
+        "✓ Dog.webp with cloud_data_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+// Tests for depthmap-gdepth manifest
+#[test]
+fn test_dog_jpg_depthmap_gdepth_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("depthmap_gdepth_manifest.json");
+    let output = generate_output_name(&input, "depthmap_gdepth", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify manifest properties and depthmap assertion
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with GDepth 3D Depth Map"
+        );
+
+        // Verify we have assertions including depthmap
+        let assertions = manifest.assertions();
+        assert!(!assertions.is_empty());
+
+        // Check that c2pa.depthmap.gdepth assertion exists
+        let has_depthmap = assertions
+            .iter()
+            .any(|a| a.label() == "c2pa.depthmap.gdepth");
+        assert!(has_depthmap, "Should have c2pa.depthmap.gdepth assertion");
+    }
+
+    println!(
+        "✓ Dog.jpg with depthmap_gdepth_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_dog_png_depthmap_gdepth_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("depthmap_gdepth_manifest.json");
+    let output = generate_output_name(&input, "depthmap_gdepth", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify manifest properties and depthmap assertion
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with GDepth 3D Depth Map"
+        );
+
+        // Verify we have the depthmap assertion
+        let assertions = manifest.assertions();
+        let has_depthmap = assertions
+            .iter()
+            .any(|a| a.label() == "c2pa.depthmap.gdepth");
+        assert!(has_depthmap, "Should have c2pa.depthmap.gdepth assertion");
+    }
+
+    println!(
+        "✓ Dog.png with depthmap_gdepth_manifest.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_dog_webp_depthmap_gdepth_manifest() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.webp");
+    let manifest = manifests_dir().join("depthmap_gdepth_manifest.json");
+    let output = generate_output_name(&input, "depthmap_gdepth", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify manifest properties and depthmap assertion
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest = reader.get_manifest(manifest_label).unwrap();
+        assert_eq!(
+            manifest.title().unwrap_or_default(),
+            "Image with GDepth 3D Depth Map"
+        );
+
+        // Verify we have the depthmap assertion
+        let assertions = manifest.assertions();
+        let has_depthmap = assertions
+            .iter()
+            .any(|a| a.label() == "c2pa.depthmap.gdepth");
+        assert!(has_depthmap, "Should have c2pa.depthmap.gdepth assertion");
+    }
+
+    println!(
+        "✓ Dog.webp with depthmap_gdepth_manifest.json: {}",
+        output.display()
+    );
     Ok(())
 }
 
