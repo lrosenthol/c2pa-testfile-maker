@@ -1,0 +1,58 @@
+{
+  "claim_generator_info": [
+    {
+      "name": "c2pa-testfile-maker/0.1.0",
+      "version": "0.1.0"
+    }
+  ],
+  "title": "Composite Image with File-Based Ingredients",
+  "format": "image/jpeg",
+  "assertions": [
+    {
+      "label": "c2pa.actions",
+      "data": {
+        "actions": [
+          {
+            "action": "c2pa.opened",
+            "when": "2024-01-07T11:00:00Z",
+            "softwareAgent": "PhotoEditor 2024"
+          },
+          {
+            "action": "c2pa.composited",
+            "when": "2024-01-07T11:30:00Z",
+            "softwareAgent": "PhotoEditor 2024",
+            "parameters": {
+              "description": "Combined multiple source images"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": "stds.schema-org.CreativeWork",
+      "data": {
+        "@context": "https://schema.org",
+        "@type": "CreativeWork",
+        "author": [
+          {
+            "@type": "Person",
+            "name": "Professional Photographer"
+          }
+        ],
+        "dateCreated": "2024-01-07T11:00:00Z"
+      }
+    }
+  ],
+  "ingredients_from_files": [
+    {
+      "title": "Background Image",
+      "relationship": "parentOf",
+      "file_path": "../testfiles/Dog.jpg"
+    },
+    {
+      "title": "Secondary Element",
+      "relationship": "componentOf",
+      "file_path": "../testfiles/Dog.png"
+    }
+  ]
+}

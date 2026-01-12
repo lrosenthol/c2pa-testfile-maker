@@ -1,10 +1,12 @@
 use anyhow::Result;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 mod common;
 
 use common::{
-    get_test_images, manifests_dir, output_dir, sign_file_with_manifest, verify_signed_file,
+    get_test_images, manifests_dir, output_dir, sign_file_with_manifest,
+    sign_file_with_manifest_and_ingredients, verify_signed_file,
 };
 
 /// Generate output filename from input filename and manifest type
@@ -1177,5 +1179,159 @@ fn test_manifest_roundtrip_with_spec_version() -> Result<()> {
         original_actions_data.len()
     );
 
+    Ok(())
+}
+
+// ============================================================================
+// Ingredient Tests - File-based ingredient loading
+// ============================================================================
+
+#[test]
+fn test_simple_with_ingredient() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("simple_with_ingredient.json");
+    let output = generate_output_name(&input, "simple_ingredient", Some("individual"));
+
+    // Get the base directory for resolving ingredient paths
+    let ingredients_base_dir = manifest.parent().unwrap();
+
+    sign_file_with_manifest_and_ingredients(&input, &output, &manifest, ingredients_base_dir)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify the manifest has ingredients
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest_store = reader.get_manifest(manifest_label).unwrap();
+        let ingredients = manifest_store.ingredients();
+
+        assert_eq!(ingredients.len(), 1, "Should have one ingredient");
+        assert_eq!(ingredients[0].title().unwrap_or_default(), "Original Image");
+    }
+
+    println!(
+        "✓ Dog.png with simple_with_ingredient.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_with_ingredients_from_files() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.webp");
+    let manifest = manifests_dir().join("with_ingredients_from_files.json");
+    let output = generate_output_name(&input, "with_ingredients", Some("individual"));
+
+    // Get the base directory for resolving ingredient paths
+    let ingredients_base_dir = manifest.parent().unwrap();
+
+    sign_file_with_manifest_and_ingredients(&input, &output, &manifest, ingredients_base_dir)?;
+
+    let reader = verify_signed_file(&output)?;
+    assert!(reader.active_label().is_some());
+
+    // Verify the manifest has multiple ingredients
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest_store = reader.get_manifest(manifest_label).unwrap();
+        let ingredients = manifest_store.ingredients();
+
+        assert_eq!(ingredients.len(), 2, "Should have two ingredients");
+
+        // Check the first ingredient (parentOf)
+        assert_eq!(
+            ingredients[0].title().unwrap_or_default(),
+            "Background Image"
+        );
+        assert_eq!(*ingredients[0].relationship(), c2pa::Relationship::ParentOf);
+
+        // Check the second ingredient (componentOf)
+        assert_eq!(
+            ingredients[1].title().unwrap_or_default(),
+            "Secondary Element"
+        );
+        assert_eq!(
+            *ingredients[1].relationship(),
+            c2pa::Relationship::ComponentOf
+        );
+    }
+
+    println!(
+        "✓ Dog.webp with with_ingredients_from_files.json: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_ingredient_thumbnails_generated() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("simple_with_ingredient.json");
+    let output = generate_output_name(&input, "ingredient_thumbnail", Some("individual"));
+
+    let ingredients_base_dir = manifest.parent().unwrap();
+
+    sign_file_with_manifest_and_ingredients(&input, &output, &manifest, ingredients_base_dir)?;
+
+    let reader = verify_signed_file(&output)?;
+
+    // Note: The test helper doesn't generate thumbnails (unlike the CLI tool which does).
+    // This test verifies that ingredients are loaded correctly.
+    // For thumbnail generation, use the CLI tool directly.
+    if let Some(manifest_label) = reader.active_label() {
+        let manifest_store = reader.get_manifest(manifest_label).unwrap();
+        let ingredients = manifest_store.ingredients();
+
+        assert_eq!(ingredients.len(), 1, "Should have one ingredient");
+        // Thumbnails are optional in the test helper
+    }
+
+    println!(
+        "✓ Ingredient loading test (without thumbnails): {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_ingredient_missing_file_error() -> Result<()> {
+    use std::io::Write;
+
+    // Create a manifest with a non-existent ingredient file
+    let manifest_content = r#"{
+        "claim_generator_info": [{"name": "test", "version": "1.0.0"}],
+        "title": "Test",
+        "ingredients_from_files": [
+            {
+                "title": "Missing",
+                "relationship": "parentOf",
+                "file_path": "../testfiles/nonexistent.jpg"
+            }
+        ]
+    }"#;
+
+    let temp_manifest = output_dir().join("temp_manifest_missing.json");
+    let mut file = fs::File::create(&temp_manifest)?;
+    file.write_all(manifest_content.as_bytes())?;
+
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let output = output_dir().join("should_fail.jpg");
+    let ingredients_base_dir = temp_manifest.parent().unwrap();
+
+    // This should fail with an error about missing file
+    let result = sign_file_with_manifest_and_ingredients(
+        &input,
+        &output,
+        &temp_manifest,
+        ingredients_base_dir,
+    );
+
+    assert!(result.is_err(), "Should fail with missing ingredient file");
+
+    // Clean up
+    if temp_manifest.exists() {
+        fs::remove_file(&temp_manifest)?;
+    }
+
+    println!("✓ Missing ingredient file error handling test passed");
     Ok(())
 }

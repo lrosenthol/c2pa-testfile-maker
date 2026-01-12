@@ -1,5 +1,5 @@
 use anyhow::Result;
-use c2pa::{Builder, CallbackSigner, Reader, SigningAlg};
+use c2pa::{Builder, CallbackSigner, Ingredient, Reader, Relationship, SigningAlg};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -54,6 +54,122 @@ pub fn sign_file_with_manifest(
     builder.sign_file(&signer, input_path, output_path)?;
 
     Ok(())
+}
+
+/// Helper function to sign a file with a manifest that includes file-based ingredients
+/// This processes ingredients with file_path fields
+pub fn sign_file_with_manifest_and_ingredients(
+    input_path: &Path,
+    output_path: &Path,
+    manifest_path: &Path,
+    ingredients_base_dir: &Path,
+) -> Result<()> {
+    // Remove output file if it already exists
+    if output_path.exists() {
+        fs::remove_file(output_path)?;
+    }
+
+    // Read the manifest JSON
+    let manifest_json = fs::read_to_string(manifest_path)?;
+
+    // Create the builder from JSON
+    let mut builder = Builder::from_json(&manifest_json)?;
+
+    // Process ingredients with file paths
+    process_ingredients(&mut builder, &manifest_json, ingredients_base_dir)?;
+
+    // Use the same test signer approach as c2pa-rs tests
+    let signer = test_signer();
+
+    // Sign and embed
+    builder.sign_file(&signer, input_path, output_path)?;
+
+    Ok(())
+}
+
+/// Process ingredients from manifest JSON and add them to the builder
+fn process_ingredients(
+    builder: &mut Builder,
+    manifest_json: &str,
+    ingredients_base_dir: &Path,
+) -> Result<()> {
+    use serde_json::Value as JsonValue;
+
+    // Parse the manifest JSON to check for ingredients with file paths
+    let manifest: JsonValue = serde_json::from_str(manifest_json)?;
+
+    // Look for "ingredients_from_files" field
+    if let Some(ingredients) = manifest
+        .get("ingredients_from_files")
+        .and_then(|v| v.as_array())
+    {
+        for ingredient_def in ingredients {
+            // All entries in ingredients_from_files must have a file_path
+            let file_path_str = ingredient_def
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing file_path in ingredient"))?;
+
+            // Resolve the file path relative to the base directory
+            let file_path = if Path::new(file_path_str).is_absolute() {
+                PathBuf::from(file_path_str)
+            } else {
+                ingredients_base_dir.join(file_path_str)
+            };
+
+            if !file_path.exists() {
+                anyhow::bail!("Ingredient file not found: {:?}", file_path);
+            }
+
+            // Load the ingredient file
+            let mut source = fs::File::open(&file_path)?;
+
+            // Determine format from file extension
+            let extension = file_path
+                .extension()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| anyhow::anyhow!("Ingredient file has no extension"))?;
+
+            let format = extension_to_mime(extension)
+                .ok_or_else(|| anyhow::anyhow!("Unsupported ingredient file format"))?;
+
+            // Create an Ingredient from the file
+            let mut ingredient = Ingredient::from_stream(format, &mut source)?;
+
+            // Set the title if provided in the manifest
+            if let Some(title) = ingredient_def.get("title").and_then(|v| v.as_str()) {
+                ingredient.set_title(title);
+            }
+
+            // Set the relationship if provided
+            if let Some(rel) = ingredient_def.get("relationship").and_then(|v| v.as_str()) {
+                let relationship = match rel.to_lowercase().as_str() {
+                    "parentof" => Relationship::ParentOf,
+                    "componentof" => Relationship::ComponentOf,
+                    _ => anyhow::bail!("Invalid relationship type: {}", rel),
+                };
+                ingredient.set_relationship(relationship);
+            }
+
+            // Add the ingredient to the builder
+            builder.add_ingredient(ingredient);
+        }
+    }
+
+    Ok(())
+}
+
+/// Converts a file extension to a MIME type
+fn extension_to_mime(extension: &str) -> Option<&'static str> {
+    Some(match extension.to_lowercase().as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "tiff" | "tif" => "image/tiff",
+        "bmp" => "image/bmp",
+        _ => return None,
+    })
 }
 
 /// Create a test signer using Ed25519 (same as c2pa-rs test infrastructure)

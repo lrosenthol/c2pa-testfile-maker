@@ -8,6 +8,7 @@ A Rust-based command-line tool that uses the [c2pa-rs](https://github.com/conten
 - 🔐 Sign manifests with various cryptographic algorithms (ES256, ES384, ES512, PS256, PS384, PS512, ED25519)
 - 🖼️ Support for multiple media formats (JPEG, PNG, and more)
 - 📁 Flexible output options (specific file or directory)
+- 🧩 **File-based ingredient loading** - automatically load and embed parent/component ingredients from files
 - ⚡ Built with Rust for performance and safety
 
 ## Installation
@@ -85,6 +86,15 @@ c2pa-testfile-maker \
   - ⚠️ **Warning**: Use only for development and testing with properly formatted certificates
   - Bypasses certificate chain validation during signer creation
   - Note: The c2pa library may still reject truly self-signed certificates during signing
+- `--ingredients-dir <DIR>`: Base directory for resolving relative ingredient file paths
+  - If not specified, defaults to the manifest file's parent directory
+  - Used when the manifest includes `ingredients_from_files` entries
+- `--thumbnail-asset`: Generate a thumbnail for the main asset (default: false)
+  - Creates a 256x256 JPEG thumbnail of the input file
+  - Embedded in the manifest for preview purposes
+- `--thumbnail-ingredients`: Generate thumbnails for all ingredients (default: false)
+  - Creates thumbnails for each ingredient loaded from files
+  - Only applies to ingredients specified in `ingredients_from_files`
 
 ### Example
 
@@ -237,6 +247,105 @@ The manifest JSON file defines the C2PA manifest structure. Here's a comprehensi
   - `data`: The assertion data (format depends on the label)
 - **ingredients**: Array of parent assets (for edited content)
 
+### Using File-Based Ingredients
+
+The tool supports automatically loading ingredients (parent or component assets) from files. This is useful when creating manifests for edited or composite images that combine multiple source files.
+
+#### Ingredient Configuration
+
+To use file-based ingredients, add an `ingredients_from_files` array to your manifest JSON. Each ingredient must have:
+
+- **file_path**: Path to the ingredient file (relative to the manifest or absolute)
+- **title**: Human-readable title for the ingredient
+- **relationship**: Either `"parentOf"` (for source/parent assets) or `"componentOf"` (for elements/components)
+
+Example manifest with ingredients:
+
+```json
+{
+  "claim_generator_info": [
+    {
+      "name": "my-app/1.0.0",
+      "version": "1.0.0"
+    }
+  ],
+  "title": "Edited Photo",
+  "format": "image/jpeg",
+  "assertions": [
+    {
+      "label": "c2pa.actions",
+      "data": {
+        "actions": [
+          {
+            "action": "c2pa.edited",
+            "when": "2024-01-07T12:00:00Z"
+          }
+        ]
+      }
+    }
+  ],
+  "ingredients_from_files": [
+    {
+      "title": "Original Image",
+      "relationship": "parentOf",
+      "file_path": "../originals/photo.jpg"
+    },
+    {
+      "title": "Logo Overlay",
+      "relationship": "componentOf",
+      "file_path": "../assets/logo.png"
+    }
+  ]
+}
+```
+
+#### Using Ingredients in CLI
+
+When your manifest includes `ingredients_from_files`, the tool will:
+
+1. Resolve file paths relative to the manifest's directory (or `--ingredients-dir` if specified)
+2. Load each ingredient file
+3. Add them to the manifest with the specified relationship
+4. Optionally generate thumbnails (use `--thumbnail-ingredients` flag)
+
+Example command:
+
+```bash
+./target/release/c2pa-testfile-maker \
+  --manifest examples/with_ingredients_from_files.json \
+  --input output/edited_photo.jpg \
+  --output output/signed_with_ingredients.jpg \
+  --cert certs/certificate.pem \
+  --key certs/private_key.pem \
+  --thumbnail-asset \
+  --thumbnail-ingredients
+```
+
+To specify a custom base directory for ingredient paths:
+
+```bash
+./target/release/c2pa-testfile-maker \
+  --manifest manifest.json \
+  --input edited.jpg \
+  --output signed.jpg \
+  --cert cert.pem \
+  --key key.pem \
+  --ingredients-dir /path/to/source/files
+```
+
+#### Ingredient Features
+
+- **Optional thumbnail generation**: Use `--thumbnail-ingredients` to generate thumbnails for ingredients
+- **Format support**: Ingredients can be in any supported image format (JPEG, PNG, WebP, etc.)
+- **Relationship tracking**: Properly marks ingredients as parent sources or added components
+- **Path resolution**: Supports both relative and absolute file paths
+
+### Mixing Ingredient Types
+
+You can use both inline ingredient definitions (via the standard `ingredients` array) and file-based ingredients (via `ingredients_from_files`) in the same manifest. The `ingredients_from_files` are processed separately and won't create duplicate entries.
+
+
+
 ### Common Assertion Types
 
 1. **Actions** (`c2pa.actions`): Records actions performed on the asset
@@ -265,6 +374,56 @@ See the `examples/` directory for:
 - Sample manifest JSON files
 - Test images
 - Example certificates (for testing only)
+
+### Example Manifests
+
+- **simple_manifest.json**: Basic manifest with minimal configuration
+- **full_manifest.json**: Complete manifest with multiple assertions
+- **simple_with_ingredient.json**: Manifest with a single file-based ingredient
+- **with_ingredients_from_files.json**: Manifest demonstrating multiple file-based ingredients
+- **actions_v2_*.json**: Examples of C2PA Actions v2 assertions (cropped, edited, filtered, etc.)
+- **asset_ref_manifest.json**: Asset reference assertion example
+- **cloud_data_manifest.json**: Cloud data assertion example
+- **depthmap_gdepth_manifest.json**: Depth map assertion example
+
+### Quick Start Examples
+
+Create a signed image with a simple manifest:
+
+```bash
+./target/release/c2pa-testfile-maker \
+  --manifest examples/simple_manifest.json \
+  --input testfiles/Dog.jpg \
+  --output output/Dog_signed.jpg \
+  --cert tests/fixtures/certs/ed25519.pub \
+  --key tests/fixtures/certs/ed25519.pem \
+  --algorithm ed25519 \
+  --allow-self-signed
+```
+
+Create a signed image with ingredients and thumbnails:
+
+```bash
+./target/release/c2pa-testfile-maker \
+  --manifest examples/with_ingredients_from_files.json \
+  --input testfiles/Dog.webp \
+  --output output/Dog_with_ingredients.webp \
+  --cert tests/fixtures/certs/ed25519.pub \
+  --key tests/fixtures/certs/ed25519.pem \
+  --algorithm ed25519 \
+  --thumbnail-asset \
+  --thumbnail-ingredients \
+  --allow-self-signed
+```
+
+Extract a manifest from a signed file:
+
+```bash
+./target/release/c2pa-testfile-maker \
+  --extract \
+  --input output/Dog_signed.jpg \
+  --output output/extracted_manifest.json
+```
 
 ## Architecture
 

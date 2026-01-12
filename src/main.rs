@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
-use c2pa::{create_signer, Builder, CallbackSigner, Reader, SigningAlg};
+use c2pa::{create_signer, Builder, CallbackSigner, Ingredient, Reader, Relationship, SigningAlg};
 use clap::Parser;
+use serde_json::Value as JsonValue;
 use std::fs;
+use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
 
 /// C2PA Testfile Maker - Create and embed C2PA manifests into media assets
@@ -40,6 +42,18 @@ struct Cli {
     /// Extract manifest from input file to JSON (read-only mode)
     #[arg(short, long, default_value = "false")]
     extract: bool,
+
+    /// Base directory for resolving relative ingredient file paths (defaults to manifest directory)
+    #[arg(long, value_name = "DIR")]
+    ingredients_dir: Option<PathBuf>,
+
+    /// Generate thumbnail for the main asset
+    #[arg(long, default_value = "false")]
+    thumbnail_asset: bool,
+
+    /// Generate thumbnails for ingredients
+    #[arg(long, default_value = "false")]
+    thumbnail_ingredients: bool,
 }
 
 fn determine_output_path(input: &Path, output: &Path) -> Result<PathBuf> {
@@ -49,6 +63,179 @@ fn determine_output_path(input: &Path, output: &Path) -> Result<PathBuf> {
     } else {
         Ok(output.to_path_buf())
     }
+}
+
+/// Converts a file extension to a MIME type
+fn extension_to_mime(extension: &str) -> Option<&'static str> {
+    Some(match extension.to_lowercase().as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "psd" => "image/vnd.adobe.photoshop",
+        "tiff" | "tif" => "image/tiff",
+        "svg" => "image/svg+xml",
+        "ico" => "image/x-icon",
+        "bmp" => "image/bmp",
+        "webp" => "image/webp",
+        "dng" => "image/dng",
+        "heic" => "image/heic",
+        "heif" => "image/heif",
+        "avif" => "image/avif",
+        "mp2" | "mpa" | "mpe" | "mpeg" | "mpg" | "mpv2" => "video/mpeg",
+        "mp4" => "video/mp4",
+        "mov" | "qt" => "video/quicktime",
+        "m4a" => "audio/mp4",
+        "mid" | "rmi" => "audio/mid",
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/vnd.wav",
+        "aif" | "aifc" | "aiff" => "audio/aiff",
+        "ogg" => "audio/ogg",
+        "pdf" => "application/pdf",
+        "ai" => "application/postscript",
+        _ => return None,
+    })
+}
+
+/// Generate a thumbnail from an image stream
+/// Returns (format, thumbnail_bytes)
+fn make_thumbnail_from_stream(format: &str, stream: &mut fs::File) -> Result<(String, Vec<u8>)> {
+    use image::ImageFormat;
+
+    // Determine image format from MIME type
+    let img_format = match format {
+        "image/jpeg" => ImageFormat::Jpeg,
+        "image/png" => ImageFormat::Png,
+        "image/gif" => ImageFormat::Gif,
+        "image/bmp" => ImageFormat::Bmp,
+        "image/tiff" => ImageFormat::Tiff,
+        "image/webp" => ImageFormat::WebP,
+        _ => ImageFormat::Jpeg, // Default to JPEG for unknown formats
+    };
+
+    // Wrap in BufReader for image loading
+    let reader = BufReader::new(stream);
+
+    // Load and resize the image
+    let img =
+        image::load(reader, img_format).context("Failed to load image for thumbnail generation")?;
+
+    const THUMBNAIL_SIZE: u32 = 256;
+    let thumbnail = img.thumbnail(THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+
+    // Encode thumbnail to bytes (always use JPEG for thumbnails)
+    let mut buf = Cursor::new(Vec::new());
+    thumbnail
+        .write_to(&mut buf, ImageFormat::Jpeg)
+        .context("Failed to encode thumbnail")?;
+
+    Ok(("image/jpeg".to_string(), buf.into_inner()))
+}
+
+/// Process ingredients from manifest JSON and add them to the builder
+/// Returns the number of ingredients processed from files
+fn process_ingredients(
+    builder: &mut Builder,
+    manifest_json: &str,
+    ingredients_base_dir: &Path,
+    generate_thumbnails: bool,
+) -> Result<usize> {
+    // Parse the manifest JSON to check for ingredients with file paths
+    let manifest: JsonValue =
+        serde_json::from_str(manifest_json).context("Failed to parse manifest JSON")?;
+
+    let mut count = 0;
+
+    // Look for "ingredients_from_files" field (separate from standard "ingredients")
+    if let Some(ingredients) = manifest
+        .get("ingredients_from_files")
+        .and_then(|v| v.as_array())
+    {
+        for ingredient_def in ingredients {
+            // All entries in ingredients_from_files must have a file_path
+            let file_path_str = ingredient_def
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .context("Ingredient in ingredients_from_files must have a file_path field")?;
+
+            count += 1;
+
+            // Resolve the file path relative to the base directory
+            let file_path = if Path::new(file_path_str).is_absolute() {
+                PathBuf::from(file_path_str)
+            } else {
+                ingredients_base_dir.join(file_path_str)
+            };
+
+            if !file_path.exists() {
+                anyhow::bail!(
+                    "Ingredient file not found: {} (resolved to: {:?})",
+                    file_path_str,
+                    file_path
+                );
+            }
+
+            println!("  Loading ingredient: {:?}", file_path);
+
+            // Load the ingredient file
+            let mut source = fs::File::open(&file_path)
+                .context(format!("Failed to open ingredient file: {:?}", file_path))?;
+
+            // Determine format from file extension
+            let extension = file_path
+                .extension()
+                .and_then(|s| s.to_str())
+                .context(format!("Ingredient file has no extension: {:?}", file_path))?;
+
+            let format = extension_to_mime(extension)
+                .context(format!("Unsupported ingredient file format: {}", extension))?;
+
+            // Create an Ingredient from the file
+            let mut ingredient = Ingredient::from_stream(format, &mut source).context(format!(
+                "Failed to create ingredient from file: {:?}",
+                file_path
+            ))?;
+
+            // Set the title if provided in the manifest
+            if let Some(title) = ingredient_def.get("title").and_then(|v| v.as_str()) {
+                ingredient.set_title(title);
+            } else {
+                // Use filename as title if not specified
+                let filename = file_path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Unknown");
+                ingredient.set_title(filename);
+            }
+
+            // Set the relationship if provided
+            if let Some(rel) = ingredient_def.get("relationship").and_then(|v| v.as_str()) {
+                let relationship = match rel.to_lowercase().as_str() {
+                    "parentof" => Relationship::ParentOf,
+                    "componentof" => Relationship::ComponentOf,
+                    _ => {
+                        anyhow::bail!("Invalid relationship type: {}", rel);
+                    }
+                };
+                ingredient.set_relationship(relationship);
+            }
+
+            // Generate thumbnail if requested and not already present
+            if generate_thumbnails && ingredient.thumbnail_ref().is_none() {
+                use std::io::Seek;
+                source.rewind()?;
+                let (thumb_format, thumbnail) = make_thumbnail_from_stream(format, &mut source)
+                    .context("Failed to generate thumbnail for ingredient")?;
+                ingredient
+                    .set_thumbnail(&thumb_format, thumbnail)
+                    .context("Failed to set thumbnail for ingredient")?;
+            }
+
+            // Add the ingredient to the builder
+            builder.add_ingredient(ingredient);
+        }
+    }
+
+    Ok(count)
 }
 
 fn parse_signing_algorithm(alg: &str) -> Result<SigningAlg> {
@@ -287,6 +474,19 @@ fn main() -> Result<()> {
     let manifest_json =
         fs::read_to_string(&manifest).context("Failed to read manifest JSON file")?;
 
+    // Determine the ingredients base directory
+    // Use the provided ingredients_dir, or default to the manifest's parent directory
+    let ingredients_base_dir = if let Some(ing_dir) = cli.ingredients_dir {
+        ing_dir
+    } else {
+        manifest
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| PathBuf::from("."))
+    };
+
+    println!("  Ingredients base directory: {:?}", ingredients_base_dir);
+
     // Determine the output path
     let output_path = determine_output_path(&cli.input, &cli.output)?;
 
@@ -322,6 +522,46 @@ fn main() -> Result<()> {
     // Create a builder from the JSON manifest
     let mut builder = Builder::from_json(&manifest_json)
         .context("Failed to create builder from JSON manifest")?;
+
+    // Process any ingredients with file paths
+    let ingredient_count = process_ingredients(
+        &mut builder,
+        &manifest_json,
+        &ingredients_base_dir,
+        cli.thumbnail_ingredients,
+    )
+    .context("Failed to process ingredients")?;
+
+    if ingredient_count > 0 {
+        println!("  Processed {} ingredient(s) from files", ingredient_count);
+        if cli.thumbnail_ingredients {
+            println!("  Generated thumbnails for ingredients");
+        }
+    }
+
+    // Generate thumbnail for the asset if requested
+    if cli.thumbnail_asset {
+        println!("  Generating thumbnail for main asset...");
+        let mut input_file = fs::File::open(&cli.input)
+            .context("Failed to open input file for thumbnail generation")?;
+
+        // Determine format from input file extension
+        let input_extension = cli
+            .input
+            .extension()
+            .and_then(|s| s.to_str())
+            .context("Input file has no extension")?;
+
+        let input_format = extension_to_mime(input_extension)
+            .context("Unsupported input file format for thumbnail")?;
+
+        let (thumb_format, thumbnail) = make_thumbnail_from_stream(input_format, &mut input_file)
+            .context("Failed to generate thumbnail for main asset")?;
+
+        builder
+            .set_thumbnail(&thumb_format, &mut Cursor::new(thumbnail))
+            .context("Failed to set thumbnail for main asset")?;
+    }
 
     // Sign and embed the manifest into the asset
     if cli.allow_self_signed {
