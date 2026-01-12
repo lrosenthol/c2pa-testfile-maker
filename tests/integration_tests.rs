@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 mod common;
 
 use common::{
-    get_test_images, manifests_dir, output_dir, sign_file_with_manifest,
-    sign_file_with_manifest_and_ingredients, verify_signed_file,
+    get_test_images, has_asset_thumbnail, has_ingredient_thumbnails, manifests_dir, output_dir,
+    sign_file_with_manifest, sign_file_with_manifest_and_ingredients,
+    sign_file_with_manifest_and_options, verify_signed_file,
 };
 
 /// Generate output filename from input filename and manifest type
@@ -1333,5 +1334,338 @@ fn test_ingredient_missing_file_error() -> Result<()> {
     }
 
     println!("✓ Missing ingredient file error handling test passed");
+    Ok(())
+}
+
+// ============================================================================
+// Thumbnail Tests - Asset and Ingredient Thumbnail Verification
+// ============================================================================
+
+#[test]
+fn test_asset_thumbnail_not_present_by_default() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("simple_manifest.json");
+    let output = generate_output_name(&input, "no_asset_thumb", Some("individual"));
+
+    sign_file_with_manifest(&input, &output, &manifest)?;
+
+    let reader = verify_signed_file(&output)?;
+
+    if let Some(manifest_label) = reader.active_label() {
+        let has_thumb = has_asset_thumbnail(&reader, manifest_label);
+        assert!(
+            !has_thumb,
+            "Asset thumbnail should NOT be present by default"
+        );
+    }
+
+    println!(
+        "✓ Asset thumbnail correctly absent by default: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_asset_thumbnail_present_when_requested() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("simple_manifest.json");
+    let output = generate_output_name(&input, "with_asset_thumb", Some("individual"));
+    let ingredients_base_dir = manifest.parent().unwrap();
+
+    sign_file_with_manifest_and_options(
+        &input,
+        &output,
+        &manifest,
+        ingredients_base_dir,
+        true,  // generate_asset_thumbnail
+        false, // generate_ingredient_thumbnails
+    )?;
+
+    let reader = verify_signed_file(&output)?;
+
+    if let Some(manifest_label) = reader.active_label() {
+        let has_thumb = has_asset_thumbnail(&reader, manifest_label);
+        assert!(
+            has_thumb,
+            "Asset thumbnail should be present when requested"
+        );
+    }
+
+    println!(
+        "✓ Asset thumbnail correctly present when requested: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_asset_thumbnail_with_different_formats() -> Result<()> {
+    let test_files = vec![
+        ("Dog.jpg", "image/jpeg"),
+        ("Dog.png", "image/png"),
+        ("Dog.webp", "image/webp"),
+    ];
+
+    for (filename, format) in test_files {
+        let input = common::testfiles_dir().join(filename);
+        let manifest = manifests_dir().join("simple_manifest.json");
+        let output = generate_output_name(&input, "asset_thumb_formats", Some("individual"));
+        let ingredients_base_dir = manifest.parent().unwrap();
+
+        sign_file_with_manifest_and_options(
+            &input,
+            &output,
+            &manifest,
+            ingredients_base_dir,
+            true,  // generate_asset_thumbnail
+            false, // generate_ingredient_thumbnails
+        )?;
+
+        let reader = verify_signed_file(&output)?;
+
+        if let Some(manifest_label) = reader.active_label() {
+            let has_thumb = has_asset_thumbnail(&reader, manifest_label);
+            assert!(
+                has_thumb,
+                "Asset thumbnail should be present for {} ({})",
+                filename, format
+            );
+        }
+
+        println!(
+            "✓ Asset thumbnail works with {}: {}",
+            format,
+            output.display()
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_ingredient_thumbnails_not_present_by_default() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("simple_with_ingredient.json");
+    let output = generate_output_name(&input, "no_ing_thumb", Some("individual"));
+    let ingredients_base_dir = manifest.parent().unwrap();
+
+    sign_file_with_manifest_and_ingredients(&input, &output, &manifest, ingredients_base_dir)?;
+
+    let reader = verify_signed_file(&output)?;
+
+    if let Some(manifest_label) = reader.active_label() {
+        let has_thumbs = has_ingredient_thumbnails(&reader, manifest_label);
+        assert!(
+            !has_thumbs,
+            "Ingredient thumbnails should NOT be present by default"
+        );
+
+        // Verify ingredients exist but without thumbnails
+        let manifest_store = reader.get_manifest(manifest_label).unwrap();
+        let ingredients = manifest_store.ingredients();
+        assert_eq!(ingredients.len(), 1, "Should have one ingredient");
+        assert!(
+            ingredients[0].thumbnail_ref().is_none(),
+            "Ingredient should not have thumbnail"
+        );
+    }
+
+    println!(
+        "✓ Ingredient thumbnails correctly absent by default: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_ingredient_thumbnails_present_when_requested() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.png");
+    let manifest = manifests_dir().join("simple_with_ingredient.json");
+    let output = generate_output_name(&input, "with_ing_thumb", Some("individual"));
+    let ingredients_base_dir = manifest.parent().unwrap();
+
+    sign_file_with_manifest_and_options(
+        &input,
+        &output,
+        &manifest,
+        ingredients_base_dir,
+        false, // generate_asset_thumbnail
+        true,  // generate_ingredient_thumbnails
+    )?;
+
+    let reader = verify_signed_file(&output)?;
+
+    if let Some(manifest_label) = reader.active_label() {
+        let has_thumbs = has_ingredient_thumbnails(&reader, manifest_label);
+        assert!(
+            has_thumbs,
+            "Ingredient thumbnails should be present when requested"
+        );
+
+        // Verify each ingredient has a thumbnail
+        let manifest_store = reader.get_manifest(manifest_label).unwrap();
+        let ingredients = manifest_store.ingredients();
+        assert_eq!(ingredients.len(), 1, "Should have one ingredient");
+        assert!(
+            ingredients[0].thumbnail_ref().is_some(),
+            "Ingredient should have thumbnail"
+        );
+    }
+
+    println!(
+        "✓ Ingredient thumbnails correctly present when requested: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_multiple_ingredients_with_thumbnails() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.webp");
+    let manifest = manifests_dir().join("with_ingredients_from_files.json");
+    let output = generate_output_name(&input, "multi_ing_thumb", Some("individual"));
+    let ingredients_base_dir = manifest.parent().unwrap();
+
+    sign_file_with_manifest_and_options(
+        &input,
+        &output,
+        &manifest,
+        ingredients_base_dir,
+        false, // generate_asset_thumbnail
+        true,  // generate_ingredient_thumbnails
+    )?;
+
+    let reader = verify_signed_file(&output)?;
+
+    if let Some(manifest_label) = reader.active_label() {
+        let has_thumbs = has_ingredient_thumbnails(&reader, manifest_label);
+        assert!(
+            has_thumbs,
+            "Ingredient thumbnails should be present for multiple ingredients"
+        );
+
+        // Verify each ingredient has a thumbnail
+        let manifest_store = reader.get_manifest(manifest_label).unwrap();
+        let ingredients = manifest_store.ingredients();
+        assert_eq!(ingredients.len(), 2, "Should have two ingredients");
+
+        for (i, ingredient) in ingredients.iter().enumerate() {
+            assert!(
+                ingredient.thumbnail_ref().is_some(),
+                "Ingredient {} should have thumbnail",
+                i
+            );
+        }
+    }
+
+    println!(
+        "✓ Multiple ingredients with thumbnails: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_both_asset_and_ingredient_thumbnails() -> Result<()> {
+    let input = common::testfiles_dir().join("Dog.jpg");
+    let manifest = manifests_dir().join("simple_with_ingredient.json");
+    let output = generate_output_name(&input, "both_thumbs", Some("individual"));
+    let ingredients_base_dir = manifest.parent().unwrap();
+
+    sign_file_with_manifest_and_options(
+        &input,
+        &output,
+        &manifest,
+        ingredients_base_dir,
+        true, // generate_asset_thumbnail
+        true, // generate_ingredient_thumbnails
+    )?;
+
+    let reader = verify_signed_file(&output)?;
+
+    if let Some(manifest_label) = reader.active_label() {
+        // Check both asset and ingredient thumbnails
+        let has_asset_thumb = has_asset_thumbnail(&reader, manifest_label);
+        let has_ing_thumbs = has_ingredient_thumbnails(&reader, manifest_label);
+
+        assert!(has_asset_thumb, "Asset thumbnail should be present");
+        assert!(has_ing_thumbs, "Ingredient thumbnails should be present");
+
+        // Verify ingredient details
+        let manifest_store = reader.get_manifest(manifest_label).unwrap();
+        let ingredients = manifest_store.ingredients();
+        assert_eq!(ingredients.len(), 1, "Should have one ingredient");
+        assert!(
+            ingredients[0].thumbnail_ref().is_some(),
+            "Ingredient should have thumbnail"
+        );
+    }
+
+    println!(
+        "✓ Both asset and ingredient thumbnails present: {}",
+        output.display()
+    );
+    Ok(())
+}
+
+#[test]
+fn test_selective_thumbnail_generation() -> Result<()> {
+    // Test 1: Only asset thumbnail
+    let input1 = common::testfiles_dir().join("Dog.jpg");
+    let manifest1 = manifests_dir().join("simple_with_ingredient.json");
+    let output1 = generate_output_name(&input1, "only_asset_thumb", Some("individual"));
+    let ingredients_base_dir1 = manifest1.parent().unwrap();
+
+    sign_file_with_manifest_and_options(
+        &input1,
+        &output1,
+        &manifest1,
+        ingredients_base_dir1,
+        true,  // generate_asset_thumbnail
+        false, // generate_ingredient_thumbnails
+    )?;
+
+    let reader1 = verify_signed_file(&output1)?;
+    if let Some(manifest_label) = reader1.active_label() {
+        assert!(
+            has_asset_thumbnail(&reader1, manifest_label),
+            "Should have asset thumbnail"
+        );
+        assert!(
+            !has_ingredient_thumbnails(&reader1, manifest_label),
+            "Should NOT have ingredient thumbnails"
+        );
+    }
+    println!("✓ Selective thumbnail: asset only");
+
+    // Test 2: Only ingredient thumbnails
+    let input2 = common::testfiles_dir().join("Dog.png");
+    let manifest2 = manifests_dir().join("simple_with_ingredient.json");
+    let output2 = generate_output_name(&input2, "only_ing_thumb", Some("individual"));
+    let ingredients_base_dir2 = manifest2.parent().unwrap();
+
+    sign_file_with_manifest_and_options(
+        &input2,
+        &output2,
+        &manifest2,
+        ingredients_base_dir2,
+        false, // generate_asset_thumbnail
+        true,  // generate_ingredient_thumbnails
+    )?;
+
+    let reader2 = verify_signed_file(&output2)?;
+    if let Some(manifest_label) = reader2.active_label() {
+        assert!(
+            !has_asset_thumbnail(&reader2, manifest_label),
+            "Should NOT have asset thumbnail"
+        );
+        assert!(
+            has_ingredient_thumbnails(&reader2, manifest_label),
+            "Should have ingredient thumbnails"
+        );
+    }
+    println!("✓ Selective thumbnail: ingredients only");
+
     Ok(())
 }

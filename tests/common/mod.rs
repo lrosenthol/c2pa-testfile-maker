@@ -64,7 +64,43 @@ pub fn sign_file_with_manifest_and_ingredients(
     manifest_path: &Path,
     ingredients_base_dir: &Path,
 ) -> Result<()> {
-    // Remove output file if it already exists
+    sign_file_with_manifest_and_ingredients_impl(
+        input_path,
+        output_path,
+        manifest_path,
+        ingredients_base_dir,
+        false,
+        false,
+    )
+}
+pub fn sign_file_with_manifest_and_options(
+    input_path: &Path,
+    output_path: &Path,
+    manifest_path: &Path,
+    ingredients_base_dir: &Path,
+    generate_asset_thumbnail: bool,
+    generate_ingredient_thumbnails: bool,
+) -> Result<()> {
+    sign_file_with_manifest_and_ingredients_impl(
+        input_path,
+        output_path,
+        manifest_path,
+        ingredients_base_dir,
+        generate_asset_thumbnail,
+        generate_ingredient_thumbnails,
+    )
+}
+
+/// Internal implementation for signing files with ingredients and thumbnails
+fn sign_file_with_manifest_and_ingredients_impl(
+    input_path: &Path,
+    output_path: &Path,
+    manifest_path: &Path,
+    ingredients_base_dir: &Path,
+    generate_asset_thumbnail: bool,
+    generate_ingredient_thumbnails: bool,
+) -> Result<()> {
+    use std::io::Cursor;
     if output_path.exists() {
         fs::remove_file(output_path)?;
     }
@@ -76,7 +112,31 @@ pub fn sign_file_with_manifest_and_ingredients(
     let mut builder = Builder::from_json(&manifest_json)?;
 
     // Process ingredients with file paths
-    process_ingredients(&mut builder, &manifest_json, ingredients_base_dir)?;
+    process_ingredients_with_thumbnails(
+        &mut builder,
+        &manifest_json,
+        ingredients_base_dir,
+        generate_ingredient_thumbnails,
+    )?;
+
+    // Generate thumbnail for the asset if requested
+    if generate_asset_thumbnail {
+        let mut input_file = fs::File::open(input_path)?;
+
+        // Determine format from input file extension
+        let input_extension = input_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| anyhow::anyhow!("Input file has no extension"))?;
+
+        let input_format = extension_to_mime(input_extension)
+            .ok_or_else(|| anyhow::anyhow!("Unsupported input file format"))?;
+
+        // Generate thumbnail
+        let (thumb_format, thumbnail) = make_thumbnail_from_stream(input_format, &mut input_file)?;
+
+        builder.set_thumbnail(&thumb_format, &mut Cursor::new(thumbnail))?;
+    }
 
     // Use the same test signer approach as c2pa-rs tests
     let signer = test_signer();
@@ -87,13 +147,15 @@ pub fn sign_file_with_manifest_and_ingredients(
     Ok(())
 }
 
-/// Process ingredients from manifest JSON and add them to the builder
-fn process_ingredients(
+/// Process ingredients from manifest JSON and add them to the builder with optional thumbnails
+fn process_ingredients_with_thumbnails(
     builder: &mut Builder,
     manifest_json: &str,
     ingredients_base_dir: &Path,
+    generate_thumbnails: bool,
 ) -> Result<()> {
     use serde_json::Value as JsonValue;
+    use std::io::Seek;
 
     // Parse the manifest JSON to check for ingredients with file paths
     let manifest: JsonValue = serde_json::from_str(manifest_json)?;
@@ -151,6 +213,13 @@ fn process_ingredients(
                 ingredient.set_relationship(relationship);
             }
 
+            // Generate thumbnail if requested and not already present
+            if generate_thumbnails && ingredient.thumbnail_ref().is_none() {
+                source.rewind()?;
+                let (thumb_format, thumbnail) = make_thumbnail_from_stream(format, &mut source)?;
+                ingredient.set_thumbnail(&thumb_format, thumbnail)?;
+            }
+
             // Add the ingredient to the builder
             builder.add_ingredient(ingredient);
         }
@@ -170,6 +239,39 @@ fn extension_to_mime(extension: &str) -> Option<&'static str> {
         "bmp" => "image/bmp",
         _ => return None,
     })
+}
+
+/// Generate a thumbnail from an image stream
+/// Returns (format, thumbnail_bytes)
+fn make_thumbnail_from_stream(format: &str, stream: &mut fs::File) -> Result<(String, Vec<u8>)> {
+    use image::ImageFormat;
+    use std::io::{BufReader, Cursor};
+
+    // Determine image format from MIME type
+    let img_format = match format {
+        "image/jpeg" => ImageFormat::Jpeg,
+        "image/png" => ImageFormat::Png,
+        "image/gif" => ImageFormat::Gif,
+        "image/bmp" => ImageFormat::Bmp,
+        "image/tiff" => ImageFormat::Tiff,
+        "image/webp" => ImageFormat::WebP,
+        _ => ImageFormat::Jpeg, // Default to JPEG for unknown formats
+    };
+
+    // Wrap in BufReader for image loading
+    let reader = BufReader::new(stream);
+
+    // Load and resize the image
+    let img = image::load(reader, img_format)?;
+
+    const THUMBNAIL_SIZE: u32 = 256;
+    let thumbnail = img.thumbnail(THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+
+    // Encode thumbnail to bytes (always use JPEG for thumbnails)
+    let mut buf = Cursor::new(Vec::new());
+    thumbnail.write_to(&mut buf, ImageFormat::Jpeg)?;
+
+    Ok(("image/jpeg".to_string(), buf.into_inner()))
 }
 
 /// Create a test signer using Ed25519 (same as c2pa-rs test infrastructure)
@@ -222,6 +324,52 @@ pub fn get_test_images() -> Vec<PathBuf> {
         testfiles.join("Dog.png"),
         testfiles.join("Dog.webp"),
     ]
+}
+
+/// Check if a manifest has an asset thumbnail assertion
+/// Note: Asset thumbnails are stored in the manifest JSON, not necessarily as assertions
+pub fn has_asset_thumbnail(reader: &Reader, manifest_label: &str) -> bool {
+    if let Some(manifest) = reader.get_manifest(manifest_label) {
+        // Check the manifest JSON for thumbnail references
+        // Asset thumbnails appear at the manifest level, while ingredient thumbnails
+        // appear under ingredients
+        let json = reader.json();
+
+        // Parse the JSON to check for manifest-level thumbnail
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) {
+            // Check if there's a manifest with a thumbnail field at the top level
+            if let Some(manifests) = value.get("manifests").and_then(|m| m.as_object()) {
+                for (_label, manifest_data) in manifests {
+                    if manifest_data.get("thumbnail").is_some() {
+                        return true;
+                    }
+                }
+            }
+
+            // Also check for thumbnail assertions (claim thumbnails)
+            let assertions = manifest.assertions();
+            if assertions
+                .iter()
+                .any(|a| a.label().starts_with("c2pa.thumbnail.claim"))
+            {
+                return true;
+            }
+        }
+
+        false
+    } else {
+        false
+    }
+}
+
+/// Check if any ingredients have thumbnails
+pub fn has_ingredient_thumbnails(reader: &Reader, manifest_label: &str) -> bool {
+    if let Some(manifest) = reader.get_manifest(manifest_label) {
+        let ingredients = manifest.ingredients();
+        ingredients.iter().any(|ing| ing.thumbnail_ref().is_some())
+    } else {
+        false
+    }
 }
 
 /// Helper function to extract manifest from a signed file
