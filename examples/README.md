@@ -19,7 +19,6 @@ A comprehensive manifest with extensive metadata:
 - Multiple actions (opened, edited, filtered)
 - Detailed author information with identifier
 - EXIF camera metadata
-- Location information (broad location)
 - Keywords and licensing
 
 **Use case**: Professional photo editing with complete provenance tracking.
@@ -96,13 +95,10 @@ Here are standard C2PA action values you can use:
 ### Required/Common Assertions
 
 - **c2pa.actions**: Documents the editing history
-- **stds.schema-org.CreativeWork**: Author and copyright metadata
 
 ### Optional Assertions
 
-- **stds.exif**: Camera and capture metadata
-- **c2pa.location.broad**: General location information
-- **c2pa.location.narrow**: Precise GPS coordinates
+- **c2pa.metadata**: Camera and capture metadata
 - **c2pa.thumbnail.claim.jpeg**: Embedded thumbnail
 - **c2pa.hash.data**: Hash of external data
 
@@ -124,4 +120,3 @@ For more details on the C2PA specification:
 - [C2PA Specification](https://c2pa.org/specifications/specifications/1.0/index.html)
 - [Action Taxonomy](https://c2pa.org/specifications/specifications/1.0/specs/C2PA_Specification.html#_actions)
 - [Assertion Reference](https://c2pa.org/specifications/specifications/1.0/specs/C2PA_Specification.html#_claim_assertions)
-

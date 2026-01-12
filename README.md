@@ -215,19 +215,6 @@ The manifest JSON file defines the C2PA manifest structure. Here's a comprehensi
           }
         ]
       }
-    },
-    {
-      "label": "stds.schema-org.CreativeWork",
-      "data": {
-        "@context": "https://schema.org",
-        "@type": "CreativeWork",
-        "author": [
-          {
-            "@type": "Person",
-            "name": "John Doe"
-          }
-        ]
-      }
     }
   ],
   "ingredients": []
@@ -349,10 +336,8 @@ You can use both inline ingredient definitions (via the standard `ingredients` a
 ### Common Assertion Types
 
 1. **Actions** (`c2pa.actions`): Records actions performed on the asset
-2. **Creative Work** (`stds.schema-org.CreativeWork`): Metadata about the creative work
-3. **EXIF** (`stds.exif`): Camera and image metadata
-4. **Location** (`c2pa.location.broad`, `c2pa.location.narrow`): Geographic information
-5. **Thumbnail** (`c2pa.thumbnail.claim.jpeg`, `c2pa.thumbnail.claim.png`): Preview images
+2. **Metadata** (`c2pa.metadata`): Camera and image metadata
+3. **Thumbnail** (`c2pa.thumbnail.claim.jpeg`, `c2pa.thumbnail.claim.png`): Preview images
 
 ## Generating Test Certificates
 

@@ -33,20 +33,6 @@
           }
         ]
       }
-    },
-    {
-      "label": "stds.schema-org.CreativeWork",
-      "data": {
-        "@context": "https://schema.org",
-        "@type": "CreativeWork",
-        "author": [
-          {
-            "@type": "Person",
-            "name": "Professional Photographer"
-          }
-        ],
-        "dateCreated": "2024-01-07T11:00:00Z"
-      }
     }
   ],
   "ingredients": [
@@ -64,4 +50,3 @@
     }
   ]
 }
-
