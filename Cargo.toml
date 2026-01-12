@@ -23,6 +23,7 @@ rsa = { version = "0.9", features = ["sha2"] }
 x509-parser = "0.16"
 der-parser = "9.0"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "bmp", "tiff", "webp"] }
+glob = "0.3"
 
 [dev-dependencies]
 ed25519-dalek = "2.2"

@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use c2pa::{create_signer, Builder, CallbackSigner, Ingredient, Reader, Relationship, SigningAlg};
 use clap::Parser;
+use glob::glob;
 use serde_json::Value as JsonValue;
 use std::fs;
 use std::io::{BufReader, Cursor};
@@ -14,11 +15,11 @@ struct Cli {
     #[arg(short, long, value_name = "FILE")]
     manifest: Option<PathBuf>,
 
-    /// Path to the input media asset (JPEG, PNG, etc.)
-    #[arg(short, long, value_name = "FILE")]
-    input: PathBuf,
+    /// Path(s) to input media asset(s) (JPEG, PNG, etc.). Supports glob patterns (e.g., "*.jpg", "images/*.png")
+    #[arg(short, long, value_name = "FILE", num_args = 1..)]
+    input: Vec<String>,
 
-    /// Path to the output file or directory
+    /// Path to the output file or directory (required when processing single file, must be directory for multiple files)
     #[arg(short, long, value_name = "PATH")]
     output: PathBuf,
 
@@ -54,6 +55,50 @@ struct Cli {
     /// Generate thumbnails for ingredients
     #[arg(long, default_value = "false")]
     thumbnail_ingredients: bool,
+}
+
+/// Configuration for processing files with C2PA manifests
+struct ProcessingConfig<'a> {
+    manifest_json: &'a str,
+    ingredients_base_dir: &'a Path,
+    cert: &'a Path,
+    key: &'a Path,
+    signing_alg: SigningAlg,
+    allow_self_signed: bool,
+    thumbnail_asset: bool,
+    thumbnail_ingredients: bool,
+}
+
+/// Expand glob patterns and collect matching file paths
+fn expand_input_patterns(patterns: &[String]) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+
+    for pattern in patterns {
+        let pattern_path = PathBuf::from(pattern);
+
+        // Check if this is a literal path (not a glob pattern)
+        if pattern_path.exists() {
+            files.push(pattern_path);
+        } else {
+            // Try to expand as a glob pattern
+            let matches: Vec<PathBuf> = glob(pattern)
+                .context(format!("Invalid glob pattern: {}", pattern))?
+                .filter_map(|entry: std::result::Result<PathBuf, glob::GlobError>| entry.ok())
+                .collect();
+
+            if matches.is_empty() {
+                anyhow::bail!("No files match pattern: {}", pattern);
+            }
+
+            files.extend(matches);
+        }
+    }
+
+    // Remove duplicates and sort for consistent processing order
+    files.sort();
+    files.dedup();
+
+    Ok(files)
 }
 
 fn determine_output_path(input: &Path, output: &Path) -> Result<PathBuf> {
@@ -446,17 +491,164 @@ fn extract_manifest(input_path: &Path, output_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Process a single input file with the manifest
+fn process_single_file(
+    input_path: &Path,
+    output_path: &Path,
+    config: &ProcessingConfig,
+) -> Result<()> {
+    println!("\n=== Processing: {:?} ===", input_path);
+
+    // Validate input file exists
+    if !input_path.exists() {
+        anyhow::bail!("Input file does not exist: {:?}", input_path);
+    }
+
+    // Determine the output path
+    let final_output_path = determine_output_path(input_path, output_path)?;
+
+    // Create output directory if it doesn't exist
+    if let Some(parent) = final_output_path.parent() {
+        fs::create_dir_all(parent).context("Failed to create output directory")?;
+    }
+
+    // Remove existing output file if it exists (to avoid embedding failures)
+    if final_output_path.exists() {
+        fs::remove_file(&final_output_path).context("Failed to remove existing output file")?;
+        println!(
+            "  Note: Removed existing output file: {:?}",
+            final_output_path
+        );
+    }
+
+    println!("  Input: {:?}", input_path);
+    println!("  Output: {:?}", final_output_path);
+
+    // Create a builder from the JSON manifest
+    let mut builder = Builder::from_json(config.manifest_json)
+        .context("Failed to create builder from JSON manifest")?;
+
+    // Process any ingredients with file paths
+    let ingredient_count = process_ingredients(
+        &mut builder,
+        config.manifest_json,
+        config.ingredients_base_dir,
+        config.thumbnail_ingredients,
+    )
+    .context("Failed to process ingredients")?;
+
+    if ingredient_count > 0 {
+        println!("  Processed {} ingredient(s) from files", ingredient_count);
+        if config.thumbnail_ingredients {
+            println!("  Generated thumbnails for ingredients");
+        }
+    }
+
+    // Generate thumbnail for the asset if requested
+    if config.thumbnail_asset {
+        println!("  Generating thumbnail for main asset...");
+        let mut input_file = fs::File::open(input_path)
+            .context("Failed to open input file for thumbnail generation")?;
+
+        // Determine format from input file extension
+        let input_extension = input_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .context("Input file has no extension")?;
+
+        let input_format = extension_to_mime(input_extension)
+            .context("Unsupported input file format for thumbnail")?;
+
+        let (thumb_format, thumbnail) = make_thumbnail_from_stream(input_format, &mut input_file)
+            .context("Failed to generate thumbnail for main asset")?;
+
+        builder
+            .set_thumbnail(&thumb_format, &mut Cursor::new(thumbnail))
+            .context("Failed to set thumbnail for main asset")?;
+    }
+
+    // Sign and embed the manifest into the asset
+    if config.allow_self_signed {
+        // Use callback signer that bypasses certificate validation
+        let signer = create_callback_signer(config.cert, config.key, config.signing_alg)
+            .context("Failed to create callback signer")?;
+        builder
+            .sign_file(&signer, input_path, &final_output_path)
+            .context("Failed to sign and embed manifest")?;
+    } else {
+        // Use standard signer with full certificate validation
+        let signer = create_signer::from_files(
+            config.cert.to_str().context("Invalid cert path")?,
+            config.key.to_str().context("Invalid key path")?,
+            config.signing_alg,
+            None,
+        )
+        .context("Failed to create signer")?;
+        builder
+            .sign_file(&*signer, input_path, &final_output_path)
+            .context("Failed to sign and embed manifest")?;
+    }
+
+    println!("✓ Successfully created and embedded C2PA manifest");
+    println!("  Output file: {:?}", final_output_path);
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Validate input file exists
-    if !cli.input.exists() {
-        anyhow::bail!("Input file does not exist: {:?}", cli.input);
+    // Expand glob patterns and collect all input files
+    let input_files =
+        expand_input_patterns(&cli.input).context("Failed to expand input file patterns")?;
+
+    if input_files.is_empty() {
+        anyhow::bail!("No input files specified");
     }
+
+    // Validate input files exist
+    for input_file in &input_files {
+        if !input_file.exists() {
+            anyhow::bail!("Input file does not exist: {:?}", input_file);
+        }
+    }
+
+    println!("Found {} input file(s) to process", input_files.len());
 
     // Handle extract mode
     if cli.extract {
-        return extract_manifest(&cli.input, &cli.output);
+        // Output must be a directory if processing multiple files
+        if input_files.len() > 1 && !cli.output.is_dir() {
+            anyhow::bail!(
+                "Output must be a directory when extracting from multiple input files. Got: {:?}",
+                cli.output
+            );
+        }
+
+        // Process each file
+        let mut success_count = 0;
+        let mut error_count = 0;
+
+        for input_file in &input_files {
+            match extract_manifest(input_file, &cli.output) {
+                Ok(_) => success_count += 1,
+                Err(e) => {
+                    eprintln!("Error processing {:?}: {}", input_file, e);
+                    error_count += 1;
+                }
+            }
+        }
+
+        println!("\n=== Extraction Summary ===");
+        println!("  Successful: {}", success_count);
+        println!("  Failed: {}", error_count);
+        println!("  Total: {}", input_files.len());
+
+        if error_count > 0 {
+            anyhow::bail!("{} file(s) failed to extract", error_count);
+        }
+
+        return Ok(());
     }
 
     // Normal signing mode - validate required arguments
@@ -469,6 +661,14 @@ fn main() -> Result<()> {
     let key = cli
         .key
         .context("--key is required when not in extract mode")?;
+
+    // Output must be a directory if processing multiple files
+    if input_files.len() > 1 && !cli.output.is_dir() {
+        anyhow::bail!(
+            "Output must be a directory when processing multiple input files. Got: {:?}",
+            cli.output
+        );
+    }
 
     // Read and parse the JSON manifest configuration
     let manifest_json =
@@ -487,20 +687,6 @@ fn main() -> Result<()> {
 
     println!("  Ingredients base directory: {:?}", ingredients_base_dir);
 
-    // Determine the output path
-    let output_path = determine_output_path(&cli.input, &cli.output)?;
-
-    // Create output directory if it doesn't exist
-    if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent).context("Failed to create output directory")?;
-    }
-
-    // Remove existing output file if it exists (to avoid embedding failures)
-    if output_path.exists() {
-        fs::remove_file(&output_path).context("Failed to remove existing output file")?;
-        println!("  Note: Removed existing output file: {:?}", output_path);
-    }
-
     // Auto-detect or parse signing algorithm
     let signing_alg = if let Some(alg_str) = &cli.algorithm {
         parse_signing_algorithm(alg_str)?
@@ -511,82 +697,46 @@ fn main() -> Result<()> {
         detected
     };
 
-    println!("Creating C2PA manifest...");
-    println!("  Input: {:?}", cli.input);
-    println!("  Output: {:?}", output_path);
+    println!("Creating C2PA manifest(s)...");
     println!("  Algorithm: {:?}", signing_alg);
     if cli.allow_self_signed {
         println!("  Note: Allowing self-signed certificates (development mode)");
     }
 
-    // Create a builder from the JSON manifest
-    let mut builder = Builder::from_json(&manifest_json)
-        .context("Failed to create builder from JSON manifest")?;
+    // Create processing configuration
+    let config = ProcessingConfig {
+        manifest_json: &manifest_json,
+        ingredients_base_dir: &ingredients_base_dir,
+        cert: &cert,
+        key: &key,
+        signing_alg,
+        allow_self_signed: cli.allow_self_signed,
+        thumbnail_asset: cli.thumbnail_asset,
+        thumbnail_ingredients: cli.thumbnail_ingredients,
+    };
 
-    // Process any ingredients with file paths
-    let ingredient_count = process_ingredients(
-        &mut builder,
-        &manifest_json,
-        &ingredients_base_dir,
-        cli.thumbnail_ingredients,
-    )
-    .context("Failed to process ingredients")?;
+    // Process each input file
+    let mut success_count = 0;
+    let mut error_count = 0;
 
-    if ingredient_count > 0 {
-        println!("  Processed {} ingredient(s) from files", ingredient_count);
-        if cli.thumbnail_ingredients {
-            println!("  Generated thumbnails for ingredients");
+    for input_file in &input_files {
+        match process_single_file(input_file, &cli.output, &config) {
+            Ok(_) => success_count += 1,
+            Err(e) => {
+                eprintln!("Error processing {:?}: {}", input_file, e);
+                error_count += 1;
+            }
         }
     }
 
-    // Generate thumbnail for the asset if requested
-    if cli.thumbnail_asset {
-        println!("  Generating thumbnail for main asset...");
-        let mut input_file = fs::File::open(&cli.input)
-            .context("Failed to open input file for thumbnail generation")?;
+    println!("\n=== Processing Summary ===");
+    println!("  Successful: {}", success_count);
+    println!("  Failed: {}", error_count);
+    println!("  Total: {}", input_files.len());
 
-        // Determine format from input file extension
-        let input_extension = cli
-            .input
-            .extension()
-            .and_then(|s| s.to_str())
-            .context("Input file has no extension")?;
-
-        let input_format = extension_to_mime(input_extension)
-            .context("Unsupported input file format for thumbnail")?;
-
-        let (thumb_format, thumbnail) = make_thumbnail_from_stream(input_format, &mut input_file)
-            .context("Failed to generate thumbnail for main asset")?;
-
-        builder
-            .set_thumbnail(&thumb_format, &mut Cursor::new(thumbnail))
-            .context("Failed to set thumbnail for main asset")?;
+    if error_count > 0 {
+        anyhow::bail!("{} file(s) failed to process", error_count);
     }
-
-    // Sign and embed the manifest into the asset
-    if cli.allow_self_signed {
-        // Use callback signer that bypasses certificate validation
-        let signer = create_callback_signer(&cert, &key, signing_alg)
-            .context("Failed to create callback signer")?;
-        builder
-            .sign_file(&signer, &cli.input, &output_path)
-            .context("Failed to sign and embed manifest")?;
-    } else {
-        // Use standard signer with full certificate validation
-        let signer = create_signer::from_files(
-            cert.to_str().context("Invalid cert path")?,
-            key.to_str().context("Invalid key path")?,
-            signing_alg,
-            None,
-        )
-        .context("Failed to create signer")?;
-        builder
-            .sign_file(&*signer, &cli.input, &output_path)
-            .context("Failed to sign and embed manifest")?;
-    }
-
-    println!("✓ Successfully created and embedded C2PA manifest");
-    println!("  Output file: {:?}", output_path);
 
     Ok(())
 }
