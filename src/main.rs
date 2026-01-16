@@ -1,5 +1,8 @@
 use anyhow::{Context, Result};
-use c2pa::{create_signer, Builder, CallbackSigner, Ingredient, Reader, Relationship, SigningAlg};
+use c2pa::{
+    create_signer, Builder, CallbackSigner, Ingredient, JpegTrustReader, Reader, Relationship,
+    SigningAlg,
+};
 use clap::Parser;
 use glob::glob;
 use serde_json::Value as JsonValue;
@@ -43,6 +46,10 @@ struct Cli {
     /// Extract manifest from input file to JSON (read-only mode)
     #[arg(short, long, default_value = "false")]
     extract: bool,
+
+    /// Use JPEG Trust format for extraction (only valid with --extract)
+    #[arg(long, default_value = "false")]
+    jpt: bool,
 
     /// Base directory for resolving relative ingredient file paths (defaults to manifest directory)
     #[arg(long, value_name = "DIR")]
@@ -435,7 +442,7 @@ fn rsa_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
 }
 
 /// Extract C2PA manifest from a file and save it as JSON
-fn extract_manifest(input_path: &Path, output_path: &Path) -> Result<()> {
+fn extract_manifest(input_path: &Path, output_path: &Path, use_jpt_format: bool) -> Result<()> {
     // Validate input file exists
     if !input_path.exists() {
         anyhow::bail!("Input file does not exist: {:?}", input_path);
@@ -443,21 +450,46 @@ fn extract_manifest(input_path: &Path, output_path: &Path) -> Result<()> {
 
     println!("Extracting C2PA manifest...");
     println!("  Input: {:?}", input_path);
+    if use_jpt_format {
+        println!("  Format: JPEG Trust");
+    }
 
-    // Create a Reader from the input file
-    let reader = Reader::from_file(input_path).context(
-        "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
-    )?;
+    // Get the manifest JSON string based on format
+    let manifest_json = if use_jpt_format {
+        // Use JPEG Trust Reader
+        let mut jpt_reader = JpegTrustReader::from_file(input_path).context(
+            "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+        )?;
 
-    // Get the active manifest
-    let active_label = reader
-        .active_label()
-        .context("No active C2PA manifest found in the input file")?;
+        // Compute asset hash to include asset_info in the output
+        if let Ok(hash) = jpt_reader.compute_asset_hash_from_file(input_path) {
+            println!("  Asset hash computed: {}", hash);
+        }
 
-    println!("  Active manifest label: {}", active_label);
+        // Get the active manifest
+        let active_label = jpt_reader
+            .inner()
+            .active_label()
+            .context("No active C2PA manifest found in the input file")?;
 
-    // Get the manifest JSON string
-    let manifest_json = reader.json();
+        println!("  Active manifest label: {}", active_label);
+
+        jpt_reader.json()
+    } else {
+        // Use standard Reader
+        let reader = Reader::from_file(input_path).context(
+            "Failed to read C2PA data from input file. The file may not contain a C2PA manifest.",
+        )?;
+
+        // Get the active manifest
+        let active_label = reader
+            .active_label()
+            .context("No active C2PA manifest found in the input file")?;
+
+        println!("  Active manifest label: {}", active_label);
+
+        reader.json()
+    };
 
     // Determine the final output path
     let final_output_path = if output_path.is_dir() {
@@ -467,7 +499,12 @@ fn extract_manifest(input_path: &Path, output_path: &Path) -> Result<()> {
             .context("Input file has no filename")?
             .to_str()
             .context("Invalid UTF-8 in filename")?;
-        output_path.join(format!("{}_manifest.json", input_stem))
+        let suffix = if use_jpt_format {
+            "_manifest_jpt.json"
+        } else {
+            "_manifest.json"
+        };
+        output_path.join(format!("{}{}", input_stem, suffix))
     } else {
         output_path.to_path_buf()
     };
@@ -617,6 +654,11 @@ fn main() -> Result<()> {
 
     // Handle extract mode
     if cli.extract {
+        // Validate --jpt can only be used with --extract
+        if cli.jpt {
+            println!("Using JPEG Trust format for extraction");
+        }
+
         // Output must be a directory if processing multiple files
         if input_files.len() > 1 && !cli.output.is_dir() {
             anyhow::bail!(
@@ -630,7 +672,7 @@ fn main() -> Result<()> {
         let mut error_count = 0;
 
         for input_file in &input_files {
-            match extract_manifest(input_file, &cli.output) {
+            match extract_manifest(input_file, &cli.output, cli.jpt) {
                 Ok(_) => success_count += 1,
                 Err(e) => {
                     eprintln!("Error processing {:?}: {}", input_file, e);
@@ -649,6 +691,11 @@ fn main() -> Result<()> {
         }
 
         return Ok(());
+    }
+
+    // Validate --jpt can only be used with --extract
+    if cli.jpt {
+        anyhow::bail!("--jpt can only be used with --extract mode");
     }
 
     // Normal signing mode - validate required arguments

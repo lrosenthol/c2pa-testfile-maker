@@ -1,5 +1,7 @@
 use anyhow::Result;
-use c2pa::{Builder, CallbackSigner, Ingredient, Reader, Relationship, SigningAlg};
+use c2pa::{
+    Builder, CallbackSigner, Ingredient, JpegTrustReader, Reader, Relationship, SigningAlg,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -58,6 +60,7 @@ pub fn sign_file_with_manifest(
 
 /// Helper function to sign a file with a manifest that includes file-based ingredients
 /// This processes ingredients with file_path fields
+#[allow(dead_code)]
 pub fn sign_file_with_manifest_and_ingredients(
     input_path: &Path,
     output_path: &Path,
@@ -73,6 +76,7 @@ pub fn sign_file_with_manifest_and_ingredients(
         false,
     )
 }
+#[allow(dead_code)]
 pub fn sign_file_with_manifest_and_options(
     input_path: &Path,
     output_path: &Path,
@@ -92,6 +96,7 @@ pub fn sign_file_with_manifest_and_options(
 }
 
 /// Internal implementation for signing files with ingredients and thumbnails
+#[allow(dead_code)]
 fn sign_file_with_manifest_and_ingredients_impl(
     input_path: &Path,
     output_path: &Path,
@@ -148,6 +153,7 @@ fn sign_file_with_manifest_and_ingredients_impl(
 }
 
 /// Process ingredients from manifest JSON and add them to the builder with optional thumbnails
+#[allow(dead_code)]
 fn process_ingredients_with_thumbnails(
     builder: &mut Builder,
     manifest_json: &str,
@@ -229,6 +235,7 @@ fn process_ingredients_with_thumbnails(
 }
 
 /// Converts a file extension to a MIME type
+#[allow(dead_code)]
 fn extension_to_mime(extension: &str) -> Option<&'static str> {
     Some(match extension.to_lowercase().as_str() {
         "jpg" | "jpeg" => "image/jpeg",
@@ -243,6 +250,7 @@ fn extension_to_mime(extension: &str) -> Option<&'static str> {
 
 /// Generate a thumbnail from an image stream
 /// Returns (format, thumbnail_bytes)
+#[allow(dead_code)]
 fn make_thumbnail_from_stream(format: &str, stream: &mut fs::File) -> Result<(String, Vec<u8>)> {
     use image::ImageFormat;
     use std::io::{BufReader, Cursor};
@@ -304,6 +312,7 @@ fn ed_sign(data: &[u8], private_key: &[u8]) -> c2pa::Result<Vec<u8>> {
 }
 
 /// Helper function to verify a signed file has a valid manifest
+#[allow(dead_code)]
 pub fn verify_signed_file(file_path: &Path) -> Result<Reader> {
     let reader = Reader::from_file(file_path)?;
 
@@ -328,6 +337,7 @@ pub fn get_test_images() -> Vec<PathBuf> {
 
 /// Check if a manifest has an asset thumbnail assertion
 /// Note: Asset thumbnails are stored in the manifest JSON, not necessarily as assertions
+#[allow(dead_code)]
 pub fn has_asset_thumbnail(reader: &Reader, manifest_label: &str) -> bool {
     if let Some(manifest) = reader.get_manifest(manifest_label) {
         // Check the manifest JSON for thumbnail references
@@ -363,6 +373,7 @@ pub fn has_asset_thumbnail(reader: &Reader, manifest_label: &str) -> bool {
 }
 
 /// Check if any ingredients have thumbnails
+#[allow(dead_code)]
 pub fn has_ingredient_thumbnails(reader: &Reader, manifest_label: &str) -> bool {
     if let Some(manifest) = reader.get_manifest(manifest_label) {
         let ingredients = manifest.ingredients();
@@ -374,21 +385,46 @@ pub fn has_ingredient_thumbnails(reader: &Reader, manifest_label: &str) -> bool 
 
 /// Helper function to extract manifest from a signed file
 pub fn extract_manifest_to_file(input_path: &Path, output_path: &Path) -> Result<()> {
+    extract_manifest_impl(input_path, output_path, false)
+}
+
+/// Helper function to extract manifest from a signed file in JPEG Trust format
+#[allow(dead_code)]
+pub fn extract_manifest_to_file_jpt(input_path: &Path, output_path: &Path) -> Result<()> {
+    extract_manifest_impl(input_path, output_path, true)
+}
+
+/// Internal implementation for extracting manifests
+fn extract_manifest_impl(input_path: &Path, output_path: &Path, use_jpt: bool) -> Result<()> {
     // Remove output file if it already exists
     if output_path.exists() {
         fs::remove_file(output_path)?;
     }
 
-    // Create a Reader from the input file
-    let reader = Reader::from_file(input_path)?;
+    // Get the manifest JSON based on format
+    let manifest_json = if use_jpt {
+        let mut jpt_reader = JpegTrustReader::from_file(input_path)?;
 
-    // Ensure there's an active manifest
-    let _active_label = reader
-        .active_label()
-        .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
+        // Compute asset hash for JPEG Trust format
+        let _ = jpt_reader.compute_asset_hash_from_file(input_path);
 
-    // Get the manifest JSON
-    let manifest_json = reader.json();
+        // Ensure there's an active manifest
+        let _active_label = jpt_reader
+            .inner()
+            .active_label()
+            .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
+
+        jpt_reader.json()
+    } else {
+        let reader = Reader::from_file(input_path)?;
+
+        // Ensure there's an active manifest
+        let _active_label = reader
+            .active_label()
+            .ok_or_else(|| anyhow::anyhow!("No active C2PA manifest found"))?;
+
+        reader.json()
+    };
 
     // Create output directory if needed
     if let Some(parent) = output_path.parent() {

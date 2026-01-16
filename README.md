@@ -82,6 +82,12 @@ c2pa-testfile-maker \
   - Supported: `es256`, `es384`, `es512`, `ps256`, `ps384`, `ps512`, `ed25519`
   - Auto-detection examines the certificate to determine the appropriate algorithm
 - `-e, --extract`: Extract manifest from input file to JSON (read-only mode, no signing)
+- `--jpt`: Use JPEG Trust format for extraction (only valid with `--extract`)
+  - Outputs manifest data in the JPEG Trust JSON format as defined in the JPEG Trust specification
+  - Includes `@context` field with JPEG Trust vocabulary
+  - Includes computed asset hash in `asset_info`
+  - Formats manifests as an array instead of an object
+  - Different validation status structure compared to standard format
 - `--allow-self-signed`: Allow self-signed certificates for testing/development (default: false)
   - ⚠️ **Warning**: Use only for development and testing with properly formatted certificates
   - Bypasses certificate chain validation during signer creation
@@ -193,10 +199,15 @@ When processing multiple files, output **must** be a directory:
 You can extract existing C2PA manifests from signed files using the `-e/--extract` option. This is useful for inspecting, analyzing, or archiving manifest data:
 
 ```bash
-# Extract from a single file to a specific file
+# Extract from a single file to a specific file (standard format)
 ./target/release/c2pa-testfile-maker \
   -e signed_image.jpg \
   --output manifest.json
+
+# Extract in JPEG Trust format
+./target/release/c2pa-testfile-maker \
+  -e --jpt signed_image.jpg \
+  --output manifest_jpt.json
 
 # Extract from a single file to a directory (auto-generates filename based on input)
 ./target/release/c2pa-testfile-maker \
@@ -204,19 +215,42 @@ You can extract existing C2PA manifests from signed files using the `-e/--extrac
   --output output_directory/
 # Creates: output_directory/signed_image_manifest.json
 
+# Extract in JPEG Trust format to a directory
+./target/release/c2pa-testfile-maker \
+  -e --jpt signed_image.jpg \
+  --output output_directory/
+# Creates: output_directory/signed_image_manifest_jpt.json
+
 # Extract from multiple files (output must be a directory)
 ./target/release/c2pa-testfile-maker \
   -e "output/*.jpg" \
   --output manifests/
 # Creates: manifests/image1_manifest.json, manifests/image2_manifest.json, etc.
+
+# Extract from multiple files in JPEG Trust format
+./target/release/c2pa-testfile-maker \
+  -e --jpt "output/*.jpg" \
+  --output manifests/
+# Creates: manifests/image1_manifest_jpt.json, manifests/image2_manifest_jpt.json, etc.
 ```
 
 In extract mode:
 - No certificate, key, or manifest file is required
 - The tool reads the C2PA manifest from the input file using the c2pa-rs Reader
 - The manifest is exported as formatted JSON
-- If the output is a directory, the filename is auto-generated as `{input_stem}_manifest.json`
+- If the output is a directory, the filename is auto-generated as:
+  - `{input_stem}_manifest.json` for standard format
+  - `{input_stem}_manifest_jpt.json` for JPEG Trust format
 - The extracted JSON contains the complete manifest store including all assertions, signatures, and metadata
+
+**JPEG Trust Format**:
+- Use the `--jpt` flag to extract in JPEG Trust format
+- This format follows the JPEG Trust specification with:
+  - `@context` field with JPEG Trust vocabulary reference
+  - `asset_info` with computed SHA-256 hash of the asset
+  - `manifests` as an array (not an object)
+  - Different validation status structure
+  - Compatible with JPEG Trust consumers and validators
 
 
 ### Algorithm Auto-Detection
