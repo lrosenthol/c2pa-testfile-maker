@@ -1,0 +1,31 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "p-actions-opened-manifest",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.opened",
+                        "when": "2026-01-17T14:44:19.231Z",
+                        "parameters": {
+                            "ingredientIds": [
+                                "test_ingredient.png"
+                            ]
+                        }
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredient_paths": [
+        "test_ingredient.png"
+    ]
+}

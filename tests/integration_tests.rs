@@ -1979,9 +1979,81 @@ fn test_testset_manifests() -> Result<()> {
             testset_dir().join("n-actions-inception.json"),
         ),
         (
+            "n-actions-inception-multiple",
+            testset_dir().join("n-actions-inception-multiple.json"),
+        ),
+        (
+            "n-actions-created-nodst",
+            testset_dir().join("n-actions-created-nodst.json"),
+        ),
+        (
+            "n-actions-opened",
+            testset_dir().join("n-actions-opened.json"),
+        ),
+        (
+            "n-actions-placed",
+            testset_dir().join("n-actions-placed.json"),
+        ),
+        (
+            "n-actions-placed-parent",
+            testset_dir().join("n-actions-placed-parent.json"),
+        ),
+        (
+            "n-actions-removed",
+            testset_dir().join("n-actions-removed.json"),
+        ),
+        (
+            "n-actions-removed-same-manifest",
+            testset_dir().join("n-actions-removed-same-manifest.json"),
+        ),
+        (
+            "n-actions-translated",
+            testset_dir().join("n-actions-translated.json"),
+        ),
+        (
+            "n-actions-redacted",
+            testset_dir().join("n-actions-redacted.json"),
+        ),
+        (
+            "n-actions-redacted-bad-uri",
+            testset_dir().join("n-actions-redacted-bad-uri.json"),
+        ),
+        (
+            "n-actions-redacted-bad-reason",
+            testset_dir().join("n-actions-redacted-bad-reason.json"),
+        ),
+        (
+            "n-actions-redacted-no-reason",
+            testset_dir().join("n-actions-redacted-no-reason.json"),
+        ),
+        (
             "p-actions-created",
             testset_dir().join("p-actions-created.json"),
         ),
+        (
+            "p-actions-created-gathered",
+            testset_dir().join("p-actions-created-gathered.json"),
+        ),
+        // (
+        //     "p-actions-opened-manifest",
+        //     testset_dir().join("p-actions-opened-manifest.json"),
+        // ),
+        (
+            "p-actions-opened-no-manifest",
+            testset_dir().join("p-actions-opened-no-manifest.json"),
+        ),
+        (
+            "p-actions-placed",
+            testset_dir().join("p-actions-placed.json"),
+        ),
+        (
+            "p-actions-translated",
+            testset_dir().join("p-actions-translated.json"),
+        ),
+        // (
+        //     "p-actions-redacted",
+        //     testset_dir().join("p-actions-redacted.json"),
+        // ),
     ];
 
     let mut success_count = 0;

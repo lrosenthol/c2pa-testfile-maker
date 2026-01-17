@@ -1,0 +1,24 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "n-actions-created-nodst",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.created",
+                        "when": "2026-01-17T14:44:19.231Z"
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}
