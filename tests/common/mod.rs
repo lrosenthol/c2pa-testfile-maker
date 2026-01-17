@@ -25,6 +25,12 @@ pub fn manifests_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples")
 }
 
+/// Test helper to get the path to testset
+#[allow(dead_code)]
+pub fn testset_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testset")
+}
+
 /// Test helper to create output directory for test artifacts
 pub fn output_dir() -> PathBuf {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test_output");

@@ -1,0 +1,30 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "n-actions-inception",
+    "assertions": [
+        {
+            "label": "c2pa.actions.v2",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.cropped",
+                        "when": "2024-01-07T11:20:00Z",
+                        "softwareAgent": {
+                            "name": "ImageTools Studio",
+                            "version": "4.2.1"
+                        },
+                        "description": "Cropped to 16:9 aspect ratio"
+                    }
+                ],
+                "allActionsIncluded": true
+            },
+            "created": true
+        }
+    ],
+    "ingredients": []
+}

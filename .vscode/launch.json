@@ -142,6 +142,35 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "TestSet Runner",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=c2pa-testfile-maker",
+                    "--package=c2pa-testfile-maker"
+                ],
+                "filter": {
+                    "name": "c2pa-testfile-maker",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "-m",
+                "testset/p-actions-created.json",
+                "testfiles/Dog.png",
+                "-o",
+                "target/output/p-actions-created.png",
+                "-c",
+                "tests/fixtures/certs/ed25519.pub",
+                "-k",
+                "tests/fixtures/certs/ed25519.pem",
+                "--allow-self-signed"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests",
             "cargo": {
                 "args": [

@@ -7,7 +7,7 @@ mod common;
 use common::{
     get_test_images, has_asset_thumbnail, has_ingredient_thumbnails, manifests_dir, output_dir,
     sign_file_with_manifest, sign_file_with_manifest_and_ingredients,
-    sign_file_with_manifest_and_options, verify_signed_file,
+    sign_file_with_manifest_and_options, testfiles_dir, testset_dir, verify_signed_file,
 };
 
 /// Generate output filename from input filename and manifest type
@@ -16,6 +16,25 @@ fn generate_output_name(input: &Path, manifest_type: &str, subdir: Option<&str>)
     let stem = input.file_stem().unwrap().to_str().unwrap();
     let ext = input.extension().unwrap().to_str().unwrap();
     let filename = format!("{}_{}.{}", stem, manifest_type, ext);
+
+    if let Some(sub) = subdir {
+        let dir = output_dir().join(sub);
+        std::fs::create_dir_all(&dir).expect("Failed to create subdirectory");
+        dir.join(filename)
+    } else {
+        output_dir().join(filename)
+    }
+}
+
+/// Generate output filename from manifest type & input extension
+/// Optionally specify a subdirectory within the output directory
+fn generate_output_name_no_stem(
+    input: &Path,
+    manifest_type: &str,
+    subdir: Option<&str>,
+) -> PathBuf {
+    let ext = input.extension().unwrap().to_str().unwrap();
+    let filename = format!("{}.{}", manifest_type, ext);
 
     if let Some(sub) = subdir {
         let dir = output_dir().join(sub);
@@ -1945,6 +1964,100 @@ fn test_multi_file_requires_directory_output() -> Result<()> {
     );
 
     println!("✓ Multi-file directory requirement test passed");
+
+    Ok(())
+}
+
+// Run the TestSet files
+#[test]
+fn test_testset_manifests() -> Result<()> {
+    use std::process::Command;
+
+    let manifests = vec![
+        (
+            "n-actions-inception",
+            testset_dir().join("n-actions-inception.json"),
+        ),
+        (
+            "p-actions-created",
+            testset_dir().join("p-actions-created.json"),
+        ),
+    ];
+
+    let mut success_count = 0;
+    let mut total_count = 0;
+
+    let input = testfiles_dir().join("Dog.jpg");
+
+    for (manifest_type, manifest_path) in &manifests {
+        total_count += 1;
+        // Use "testset" subdirectory to avoid conflicts with individual tests
+        let output = generate_output_name_no_stem(&input, manifest_type, Some("testset"));
+
+        match sign_file_with_manifest(&input, &output, manifest_path) {
+            Ok(_) => match verify_signed_file(&output) {
+                Ok(_) => {
+                    success_count += 1;
+                    println!(
+                        "✓ Created {} from {} + {}",
+                        output.file_name().unwrap().to_str().unwrap(),
+                        input.file_name().unwrap().to_str().unwrap(),
+                        manifest_type
+                    );
+                }
+                Err(e) => {
+                    eprintln!("✗ Verification failed for {:?}: {}", output, e);
+                }
+            },
+            Err(e) => {
+                eprintln!(
+                    "✗ Signing failed for {:?} with {}: {}",
+                    input, manifest_type, e
+                );
+            }
+        }
+
+        {
+            // Now extract the newly created manifest into JSON
+            let binary_path = env!("CARGO_BIN_EXE_c2pa-testfile-maker");
+            let output_testset_dir = output_dir().join("testset");
+
+            let result = Command::new(binary_path)
+                .arg("--extract")
+                .arg("--jpt")
+                .arg(&output)
+                .arg("--output")
+                .arg(&output_testset_dir)
+                .output()?;
+
+            if result.status.success() {
+                println!(
+                    "✓ Extraction of manifest from {:?}",
+                    output.file_name().unwrap().to_str().unwrap(),
+                );
+            } else {
+                println!(
+                    "✗ Extraction failed for {:?}: {}",
+                    output,
+                    String::from_utf8_lossy(&result.stderr)
+                );
+            }
+
+            // // Verify manifest files were created
+            // let manifest1 = testfiles_dir().join("Dog_signed_manifest.json");
+
+            // assert!(
+            //     manifest1.exists(),
+            //     "Manifest file Dog_signed_manifest.json should exist"
+            // );
+        }
+    }
+
+    println!("\n{}/{} tests passed", success_count, total_count);
+    assert_eq!(
+        success_count, total_count,
+        "All image/manifest combinations should succeed"
+    );
 
     Ok(())
 }
