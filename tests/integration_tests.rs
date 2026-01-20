@@ -1974,6 +1974,7 @@ fn test_testset_manifests() -> Result<()> {
     use std::process::Command;
 
     let manifest_names = vec![
+        "n-actions-created-gathered",
         "n-actions-inception",
         "n-actions-inception-multiple",
         "n-actions-created-nodst",
@@ -1990,7 +1991,6 @@ fn test_testset_manifests() -> Result<()> {
         "n-actions-watermarked-bound",
         "n-actions-softwareAgent-missing",
         "p-actions-created",
-        "p-actions-created-gathered",
         // "p-actions-opened-manifest",
         "p-actions-opened-no-manifest",
         "p-actions-placed",
