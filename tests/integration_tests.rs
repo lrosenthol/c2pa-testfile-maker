@@ -1973,111 +1973,33 @@ fn test_multi_file_requires_directory_output() -> Result<()> {
 fn test_testset_manifests() -> Result<()> {
     use std::process::Command;
 
-    let manifests = vec![
-        (
-            "n-actions-inception",
-            testset_dir().join("n-actions-inception.json"),
-        ),
-        (
-            "n-actions-inception-multiple",
-            testset_dir().join("n-actions-inception-multiple.json"),
-        ),
-        (
-            "n-actions-created-nodst",
-            testset_dir().join("n-actions-created-nodst.json"),
-        ),
-        (
-            "n-actions-opened",
-            testset_dir().join("n-actions-opened.json"),
-        ),
-        (
-            "n-actions-placed",
-            testset_dir().join("n-actions-placed.json"),
-        ),
-        (
-            "n-actions-placed-parent",
-            testset_dir().join("n-actions-placed-parent.json"),
-        ),
-        (
-            "n-actions-removed",
-            testset_dir().join("n-actions-removed.json"),
-        ),
-        (
-            "n-actions-removed-same-manifest",
-            testset_dir().join("n-actions-removed-same-manifest.json"),
-        ),
-        (
-            "n-actions-translated",
-            testset_dir().join("n-actions-translated.json"),
-        ),
-        (
-            "n-actions-redacted",
-            testset_dir().join("n-actions-redacted.json"),
-        ),
-        (
-            "n-actions-redacted-bad-uri",
-            testset_dir().join("n-actions-redacted-bad-uri.json"),
-        ),
-        (
-            "n-actions-redacted-bad-reason",
-            testset_dir().join("n-actions-redacted-bad-reason.json"),
-        ),
-        (
-            "n-actions-redacted-no-reason",
-            testset_dir().join("n-actions-redacted-no-reason.json"),
-        ),
-        (
-            "n-actions-watermarked-bound",
-            testset_dir().join("n-actions-watermarked-bound.json"),
-        ),
-        (
-            "n-actions-softwareAgent-missing",
-            testset_dir().join("n-actions-softwareAgent-missing.json"),
-        ),
-        (
-            "p-actions-created",
-            testset_dir().join("p-actions-created.json"),
-        ),
-        (
-            "p-actions-created-gathered",
-            testset_dir().join("p-actions-created-gathered.json"),
-        ),
-        // (
-        //     "p-actions-opened-manifest",
-        //     testset_dir().join("p-actions-opened-manifest.json"),
-        // ),
-        (
-            "p-actions-opened-no-manifest",
-            testset_dir().join("p-actions-opened-no-manifest.json"),
-        ),
-        (
-            "p-actions-placed",
-            testset_dir().join("p-actions-placed.json"),
-        ),
-        (
-            "p-actions-translated",
-            testset_dir().join("p-actions-translated.json"),
-        ),
-        // (
-        //     "p-actions-redacted",
-        //     testset_dir().join("p-actions-redacted.json"),
-        // ),
-        (
-            "p-actions-softwareAgents",
-            testset_dir().join("p-actions-softwareAgents.json"),
-        ),
-        (
-            "p-actions-changes-spatial",
-            testset_dir().join("p-actions-changes-spatial.json"),
-        ),
-        (
-            "p-actions-watermarked-unbound",
-            testset_dir().join("p-actions-watermarked-unbound.json"),
-        ),
-        (
-            "p-actions-watermarked-bound",
-            testset_dir().join("p-actions-watermarked-bound.json"),
-        ),
+    let manifest_names = vec![
+        "n-actions-inception",
+        "n-actions-inception-multiple",
+        "n-actions-created-nodst",
+        "n-actions-opened",
+        "n-actions-placed",
+        "n-actions-placed-parent",
+        "n-actions-removed",
+        "n-actions-removed-same-manifest",
+        "n-actions-translated",
+        "n-actions-redacted",
+        "n-actions-redacted-bad-uri",
+        "n-actions-redacted-bad-reason",
+        "n-actions-redacted-no-reason",
+        "n-actions-watermarked-bound",
+        "n-actions-softwareAgent-missing",
+        "p-actions-created",
+        "p-actions-created-gathered",
+        // "p-actions-opened-manifest",
+        "p-actions-opened-no-manifest",
+        "p-actions-placed",
+        "p-actions-translated",
+        // "p-actions-redacted",
+        "p-actions-softwareAgents",
+        "p-actions-changes-spatial",
+        "p-actions-watermarked-unbound",
+        "p-actions-watermarked-bound",
     ];
 
     let mut success_count = 0;
@@ -2085,12 +2007,13 @@ fn test_testset_manifests() -> Result<()> {
 
     let input = testfiles_dir().join("Dog.jpg");
 
-    for (manifest_type, manifest_path) in &manifests {
+    for manifest_name in &manifest_names {
+        let manifest_path = testset_dir().join(format!("{}.json", manifest_name));
         total_count += 1;
         // Use "testset" subdirectory to avoid conflicts with individual tests
-        let output = generate_output_name_no_stem(&input, manifest_type, Some("testset"));
+        let output = generate_output_name_no_stem(&input, manifest_name, Some("testset"));
 
-        match sign_file_with_manifest(&input, &output, manifest_path) {
+        match sign_file_with_manifest(&input, &output, &manifest_path) {
             Ok(_) => match verify_signed_file(&output) {
                 Ok(_) => {
                     success_count += 1;
@@ -2098,7 +2021,7 @@ fn test_testset_manifests() -> Result<()> {
                         "✓ Created {} from {} + {}",
                         output.file_name().unwrap().to_str().unwrap(),
                         input.file_name().unwrap().to_str().unwrap(),
-                        manifest_type
+                        manifest_name
                     );
                 }
                 Err(e) => {
@@ -2108,7 +2031,7 @@ fn test_testset_manifests() -> Result<()> {
             Err(e) => {
                 eprintln!(
                     "✗ Signing failed for {:?} with {}: {}",
-                    input, manifest_type, e
+                    input, manifest_name, e
                 );
             }
         }
