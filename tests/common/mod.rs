@@ -32,6 +32,7 @@ pub fn testset_dir() -> PathBuf {
 }
 
 /// Test helper to create output directory for test artifacts
+#[allow(dead_code)]
 pub fn output_dir() -> PathBuf {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test_output");
     fs::create_dir_all(&dir).expect("Failed to create test output directory");
@@ -39,6 +40,7 @@ pub fn output_dir() -> PathBuf {
 }
 
 /// Helper function to sign a file with a manifest
+#[allow(dead_code)]
 pub fn sign_file_with_manifest(
     input_path: &Path,
     output_path: &Path,
@@ -402,6 +404,7 @@ pub fn has_ingredient_thumbnails(reader: &Reader, manifest_label: &str) -> bool 
 }
 
 /// Helper function to extract manifest from a signed file
+#[allow(dead_code)]
 pub fn extract_manifest_to_file(input_path: &Path, output_path: &Path) -> Result<()> {
     extract_manifest_impl(input_path, output_path, false)
 }

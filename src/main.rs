@@ -988,7 +988,7 @@ mod tests {
         writeln!(file, "{{ invalid json }}").expect("Failed to write temp file");
         drop(file);
 
-        let result = validate_json_files(&[temp_file.clone()]);
+        let result = validate_json_files(std::slice::from_ref(&temp_file));
         assert!(result.is_err());
 
         // Clean up
