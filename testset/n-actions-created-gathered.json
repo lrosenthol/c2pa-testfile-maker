@@ -5,7 +5,7 @@
             "version": "0.1.0"
         }
     ],
-    "title": "p-actions-created-gathered",
+    "title": "n-actions-created-gathered",
     "assertions": [
         {
             "label": "c2pa.actions",

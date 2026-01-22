@@ -2009,6 +2009,25 @@ fn test_testset_manifests() -> Result<()> {
 
     let input = testfiles_dir().join("Dog.jpg");
 
+    // Clean the testset output directory before starting tests to ensure a fresh state.
+    {
+        let testset_dir = output_dir().join("testset");
+        if testset_dir.exists() {
+            for entry in std::fs::read_dir(&testset_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.is_file() {
+                    std::fs::remove_file(&path)?;
+                } else if path.is_dir() {
+                    std::fs::remove_dir_all(&path)?;
+                }
+            }
+        } else {
+            std::fs::create_dir_all(&testset_dir)?;
+        }
+    }
+
+    // Process each manifest in the testset
     for manifest_name in &manifest_names {
         let manifest_path = testset_dir().join(format!("{}.json", manifest_name));
         total_count += 1;
