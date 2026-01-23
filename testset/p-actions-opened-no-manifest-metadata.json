@@ -1,0 +1,40 @@
+{
+    "claim_generator_info": [
+        {
+            "name": "c2pa-testfile-maker/0.1.0",
+            "version": "0.1.0"
+        }
+    ],
+    "title": "p-actions-opened-no-manifest",
+    "assertions": [
+        {
+            "label": "c2pa.actions",
+            "data": {
+                "actions": [
+                    {
+                        "action": "c2pa.opened",
+                        "when": "2026-01-17T14:44:19.231Z",
+                        "parameters": {
+                            "ingredientIds": [
+                                "PARENT"
+                            ]
+                        }
+                    }
+                ]
+            },
+            "created": true
+        }
+    ],
+    "ingredients": [
+        {
+            "title": "Test",
+            "format": "image/jpeg",
+            "relationship": "parentOf",
+            "label": "PARENT",
+            "metadata": {
+                "com.adobe.repo.asset-id": "{hz-acp-asset-id }",
+                "com.adobe.repo.version": "{hz-acp-version-id}"
+            }
+        }
+    ]
+}

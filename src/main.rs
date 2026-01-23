@@ -297,6 +297,28 @@ fn process_ingredients(
                 ingredient.set_instance_id(label);
             }
 
+            // Set metadata if provided
+            // This supports both standard C2PA AssertionMetadata fields and arbitrary custom fields
+            if let Some(metadata_obj) = ingredient_def.get("metadata") {
+                if let Some(metadata_map) = metadata_obj.as_object() {
+                    use c2pa::assertions::AssertionMetadata;
+                    let mut assertion_metadata = AssertionMetadata::new();
+
+                    // Iterate through all key-value pairs in the metadata object
+                    for (key, value) in metadata_map {
+                        // Use set_field to add arbitrary key/value pairs
+                        // This will work for custom fields like "com.adobe.repo.asset-id"
+                        assertion_metadata = assertion_metadata.set_field(key, value.clone());
+                    }
+
+                    ingredient.set_metadata(assertion_metadata);
+                    println!(
+                        "  Set {} metadata field(s) on ingredient",
+                        metadata_map.len()
+                    );
+                }
+            }
+
             // Add the ingredient to the builder
             builder.add_ingredient(ingredient);
         }

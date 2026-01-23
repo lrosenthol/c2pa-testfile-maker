@@ -410,13 +410,81 @@ The tool supports automatically loading ingredients (parent or component assets)
 
 #### Ingredient Configuration
 
-To use file-based ingredients, add an `ingredients_from_files` array to your manifest JSON. Each ingredient must have:
+To use file-based ingredients, add an `ingredients_from_files` array to your manifest JSON. Each ingredient can have:
 
-- **file_path**: Path to the ingredient file (relative to the manifest or absolute)
+- **file_path** (required): Path to the ingredient file (relative to the manifest or absolute)
 - **title**: Human-readable title for the ingredient
 - **relationship**: Either `"parentOf"` (for source/parent assets) or `"componentOf"` (for elements/components)
+- **label**: Instance ID for referencing the ingredient in actions (e.g., in `ingredientIds`)
+- **metadata**: Custom metadata fields (see below)
 
-Example manifest with ingredients:
+#### Ingredient Metadata Support
+
+The `metadata` field allows you to attach both standard C2PA metadata and custom key/value pairs to ingredients:
+
+**Standard C2PA metadata fields:**
+- `dateTime`: ISO 8601 timestamp
+- `reviewRatings`: Array of review ratings
+- `dataSource`: Structured data source information
+- `regionOfInterest`: Spatial/temporal regions
+- `localizations`: Localized string translations
+
+**Custom metadata fields:**
+Any additional key/value pairs are preserved as custom metadata. This is useful for application-specific or vendor-specific metadata.
+
+Example manifest with ingredient metadata:
+
+```json
+{
+  "claim_generator_info": [
+    {
+      "name": "my-app/1.0.0",
+      "version": "1.0.0"
+    }
+  ],
+  "title": "Edited Photo",
+  "assertions": [
+    {
+      "label": "c2pa.actions",
+      "data": {
+        "actions": [
+          {
+            "action": "c2pa.placed",
+            "when": "2024-01-07T12:00:00Z",
+            "parameters": {
+              "ingredientIds": ["source_image"]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "ingredients_from_files": [
+    {
+      "file_path": "../originals/photo.jpg",
+      "label": "source_image",
+      "title": "Original Image",
+      "relationship": "componentOf",
+      "metadata": {
+        "com.example.asset-id": "abc123",
+        "com.example.version": "2.0",
+        "com.example.custom-data": {
+          "author": "John Doe",
+          "project": "Project X"
+        }
+      }
+    }
+  ]
+}
+```
+
+In this example:
+- Standard fields like `title`, `relationship`, and `label` configure the ingredient
+- The `metadata` object contains custom namespaced fields
+- Custom metadata is preserved in the ingredient's AssertionMetadata
+- The ingredient can be referenced in actions using its `label` value
+
+Example manifest with ingredients (basic):
 
 ```json
 {
