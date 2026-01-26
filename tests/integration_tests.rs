@@ -1990,6 +1990,7 @@ fn test_testset_manifests() -> Result<()> {
         "n-actions-redacted-no-reason",
         "n-actions-watermarked-bound",
         "n-actions-softwareAgent-missing",
+        "n-actions-softwareAgent-and-index",
         "p-actions-created",
         "p-actions-opened-manifest",
         "p-actions-opened-no-manifest",
